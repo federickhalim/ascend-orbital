@@ -11,10 +11,11 @@ export default function HomeScreen() {
   const [mode, setMode] = useState<ModeType>("stopwatch");
   const [isRunning, setIsRunning] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [prevElapsedTime, setPrevElapsedTime] = useState(0);
   const [totalFocusTime, setTotalFocusTime] = useState(0);
   const [pomodoroPhase, setPomodoroPhase] = useState<PomodoroPhase>("focus");
+  const [prevRemainingTime, setPrevRemainingTime] = useState(25 * 60);
 
-  // 🔹 New states for streak tracking
   const [streak, setStreak] = useState(0);
   const [lastStudyDate, setLastStudyDate] = useState("");
   const [hasLoadedFromFirestore, setHasLoadedFromFirestore] = useState(false);
@@ -23,7 +24,6 @@ export default function HomeScreen() {
   const BREAK_DURATION = 5 * 60;
   const userId = "demo-user";
 
-  // 🔹 Load focus time and streak from Firestore
   useEffect(() => {
     const fetchFocusTime = async () => {
       try {
@@ -32,15 +32,9 @@ export default function HomeScreen() {
 
         if (snapshot.exists()) {
           const data = snapshot.data();
-          console.log(
-            "📥 Loaded totalFocusTime from Firestore:",
-            data.totalFocusTime
-          );
           setTotalFocusTime(data.totalFocusTime || 0);
           setStreak(data.streak || 0);
           setLastStudyDate(data.lastStudyDate || "");
-        } else {
-          console.log("📥 No document found. Starting fresh.");
         }
 
         setHasLoadedFromFirestore(true);
@@ -52,13 +46,11 @@ export default function HomeScreen() {
     fetchFocusTime();
   }, []);
 
-  // 🔹 Save to Firestore
   useEffect(() => {
     if (!hasLoadedFromFirestore) return;
 
     const saveFocusTime = async () => {
       try {
-        console.log("✅ Saving totalFocusTime to Firestore:", totalFocusTime);
         const userRef = doc(db, "users", userId);
         await setDoc(
           userRef,
@@ -79,7 +71,6 @@ export default function HomeScreen() {
 
   const [remainingTime, setRemainingTime] = useState(POMODORO_DURATION);
 
-  // 🔹 Timer logic
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
 
@@ -90,7 +81,7 @@ export default function HomeScreen() {
         } else {
           setRemainingTime((prev) => {
             if (prev <= 1) {
-              clearInterval(interval); // Stop when countdown hits 0
+              clearInterval(interval);
               return 0;
             }
             return prev - 1;
@@ -102,50 +93,50 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
   }, [isRunning, mode]);
 
-  // 🔹 Pomodoro auto-switch
   useEffect(() => {
     if (!isRunning || mode !== "pomodoro") return;
 
-    const duration =
-      pomodoroPhase === "focus" ? POMODORO_DURATION : BREAK_DURATION;
+    const duration = pomodoroPhase === "focus" ? POMODORO_DURATION : BREAK_DURATION;
 
     if (remainingTime === 0) {
       if (pomodoroPhase === "focus") {
         setTotalFocusTime((prev) => prev + duration);
-        updateStreak(); // ✅ Call streak updater here too
+        updateStreak();
         setPomodoroPhase("break");
+        setRemainingTime(BREAK_DURATION);
       } else {
         setPomodoroPhase("focus");
+        setRemainingTime(POMODORO_DURATION);
       }
-      setElapsedTime(0);
+      setIsRunning(false);
     }
-  }, [elapsedTime, isRunning, mode, pomodoroPhase]);
+  }, [remainingTime, isRunning, mode, pomodoroPhase]);
 
-  // 🔹 Streak logic
+  useEffect(() => {
+    if (!hasLoadedFromFirestore || !lastStudyDate) return;
+    const today = dayjs().format("YYYY-MM-DD");
+    if (lastStudyDate !== today) {
+      updateStreak();
+    }
+  }, [hasLoadedFromFirestore, lastStudyDate]);
+
   const updateStreak = () => {
     const today = dayjs().format("YYYY-MM-DD");
-
-    if (lastStudyDate === today) {
-      return; // already updated today
-    }
-
     const yesterday = dayjs().subtract(1, "day").format("YYYY-MM-DD");
 
+    if (lastStudyDate === today) return;
     if (lastStudyDate === yesterday) {
       setStreak((prev) => prev + 1);
     } else {
-      setStreak(1); // reset
+      setStreak(1);
     }
-
     setLastStudyDate(today);
   };
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs
-      .toString()
-      .padStart(2, "0")}`;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
   const handleStartStop = () => {
@@ -153,16 +144,26 @@ export default function HomeScreen() {
       setIsRunning(false);
 
       if (mode === "stopwatch") {
-        if (elapsedTime > 0) {
-          setTotalFocusTime((prev) => prev + elapsedTime);
+        const delta = elapsedTime - prevElapsedTime;
+        if (delta > 0) {
+          setTotalFocusTime((prev) => prev + delta);
           updateStreak();
         }
+        setPrevElapsedTime(elapsedTime); // ✅ fix: update checkpoint
       } else if (mode === "pomodoro" && pomodoroPhase === "focus") {
-        const timeSpent = POMODORO_DURATION - remainingTime;
-        setTotalFocusTime((prev) => prev + timeSpent);
-        updateStreak();
+        const timeSpent = prevRemainingTime - remainingTime;
+        if (timeSpent > 0) {
+          setTotalFocusTime((prev) => prev + timeSpent);
+          updateStreak();
+        }
+        setPrevRemainingTime(remainingTime); // ✅ fix: update checkpoint
       }
     } else {
+      if (mode === "stopwatch") {
+        setPrevElapsedTime(elapsedTime);
+      } else if (mode === "pomodoro") {
+        setPrevRemainingTime(remainingTime);
+      }
       setIsRunning(true);
     }
   };
@@ -170,25 +171,28 @@ export default function HomeScreen() {
   const handleReset = () => {
     setIsRunning(false);
     setElapsedTime(0);
+    setPrevElapsedTime(0);
     setPomodoroPhase("focus");
     if (mode === "pomodoro") {
       setRemainingTime(POMODORO_DURATION);
+      setPrevRemainingTime(POMODORO_DURATION);
     }
   };
 
   const toggleMode = () => {
     setIsRunning(false);
-    setElapsedTime(0);
     setPomodoroPhase("focus");
-    setRemainingTime(POMODORO_DURATION); // reset Pomodoro countdown
+    setRemainingTime(POMODORO_DURATION);
+    setPrevRemainingTime(POMODORO_DURATION);
+    setElapsedTime(0);
+    setPrevElapsedTime(0);
     setMode((prev) => (prev === "stopwatch" ? "pomodoro" : "stopwatch"));
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>
-        Focus Mode:{" "}
-        {mode === "stopwatch" ? "Stopwatch" : `Pomodoro (${pomodoroPhase})`}
+        Focus Mode: {mode === "stopwatch" ? "Stopwatch" : `Pomodoro (${pomodoroPhase})`}
       </Text>
 
       <TouchableOpacity onPress={toggleMode} style={styles.toggleButton}>
@@ -198,9 +202,7 @@ export default function HomeScreen() {
       </TouchableOpacity>
 
       <Text style={styles.timer}>
-        {mode === "stopwatch"
-          ? formatTime(elapsedTime)
-          : formatTime(remainingTime)}
+        {mode === "stopwatch" ? formatTime(elapsedTime) : formatTime(remainingTime)}
       </Text>
 
       <View style={styles.buttonContainer}>
@@ -209,7 +211,7 @@ export default function HomeScreen() {
           onPress={handleStartStop}
           color={isRunning ? "#d9534f" : "#5cb85c"}
         />
-        <View style={{ width: 20 }} /> {/* spacing between buttons */}
+        <View style={{ width: 20 }} />
         <Button title="Reset" onPress={handleReset} color="#f0ad4e" />
       </View>
 
