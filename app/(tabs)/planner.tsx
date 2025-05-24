@@ -1,5 +1,3 @@
-import { Picker } from "@react-native-picker/picker";
-
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -9,23 +7,26 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  //Picker,
+  Platform,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { Picker } from "@react-native-picker/picker";
 
 interface Task {
   id: string;
   text: string;
   dueDate: string;
   priority: "Low" | "Medium" | "High";
-  completed: boolean;
 }
 
 export default function PlannerPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [text, setText] = useState("");
-  const [dueDate, setDueDate] = useState("");
+  const [dueDate, setDueDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [priority, setPriority] = useState<"Low" | "Medium" | "High">("Low");
+  const [sortBy, setSortBy] = useState<"deadline" | "priority">("deadline");
 
   useEffect(() => {
     loadTasks();
@@ -37,9 +38,7 @@ export default function PlannerPage() {
 
   const loadTasks = async () => {
     const saved = await AsyncStorage.getItem("plannerTasks");
-    if (saved) {
-      setTasks(JSON.parse(saved));
-    }
+    if (saved) setTasks(JSON.parse(saved));
   };
 
   const saveTasks = async () => {
@@ -51,24 +50,33 @@ export default function PlannerPage() {
     const newTask: Task = {
       id: Date.now().toString(),
       text: text.trim(),
-      dueDate: dueDate.trim() || "No due date",
+      dueDate: dueDate.toISOString().split("T")[0],
       priority,
-      completed: false,
     };
     setTasks([...tasks, newTask]);
     setText("");
-    setDueDate("");
+    setDueDate(new Date());
     setPriority("Low");
-  };
-
-  const toggleComplete = (id: string) => {
-    setTasks(
-      tasks.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
-    );
   };
 
   const deleteTask = (id: string) => {
     setTasks(tasks.filter((t) => t.id !== id));
+  };
+
+  const getSortedTasks = () => {
+    const sorted = [...tasks];
+    if (sortBy === "priority") {
+      const order = { High: 0, Medium: 1, Low: 2 };
+      sorted.sort((a, b) => {
+        if (order[a.priority] !== order[b.priority]) {
+          return order[a.priority] - order[b.priority];
+        }
+        return a.dueDate.localeCompare(b.dueDate);
+      });
+    } else {
+      sorted.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    }
+    return sorted;
   };
 
   return (
@@ -81,12 +89,47 @@ export default function PlannerPage() {
         onChangeText={setText}
         style={styles.input}
       />
-      <TextInput
-        placeholder="Due date (YYYY-MM-DD)"
-        value={dueDate}
-        onChangeText={setDueDate}
-        style={styles.input}
-      />
+
+      {Platform.OS === "web" ? (
+        <View style={{ marginBottom: 10 }}>
+          <Text style={{ marginBottom: 5 }}>Due date:</Text>
+          <input
+            type="date"
+            value={dueDate.toISOString().split("T")[0]}
+            onChange={(e) => setDueDate(new Date(e.target.value))}
+            style={{
+              fontSize: 16,
+              padding: 10,
+              width: "100%",
+              borderRadius: 5,
+              border: "1px solid #ccc",
+            }}
+          />
+        </View>
+      ) : (
+        <>
+          <TouchableOpacity
+            style={styles.dateButton}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Text style={styles.dateText}>
+              Due: {dueDate.toISOString().split("T")[0]}
+            </Text>
+          </TouchableOpacity>
+
+          {showDatePicker && (
+            <DateTimePicker
+              value={dueDate}
+              mode="date"
+              display={Platform.OS === "ios" ? "inline" : "default"}
+              onChange={(event, selectedDate) => {
+                setShowDatePicker(false);
+                if (selectedDate) setDueDate(selectedDate);
+              }}
+            />
+          )}
+        </>
+      )}
 
       <Picker
         selectedValue={priority}
@@ -100,24 +143,26 @@ export default function PlannerPage() {
 
       <Button title="Add Task" onPress={addTask} />
 
+      <Text style={{ marginTop: 20, fontWeight: "bold" }}>Sort by:</Text>
+      <Picker
+        selectedValue={sortBy}
+        onValueChange={(val) => setSortBy(val as "deadline" | "priority")}
+        style={styles.picker}
+      >
+        <Picker.Item label="Deadline" value="deadline" />
+        <Picker.Item label="Priority" value="priority" />
+      </Picker>
+
       <FlatList
-        data={[...tasks].sort((a, b) => {
-          const priorityOrder = { High: 0, Medium: 1, Low: 2 };
-          return priorityOrder[a.priority] - priorityOrder[b.priority];
-        })}
+        data={getSortedTasks()}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View style={styles.taskContainer}>
-            <TouchableOpacity
-              onPress={() => toggleComplete(item.id)}
-              style={{ flex: 1 }}
-            >
-              <Text
-                style={item.completed ? styles.completedTask : styles.taskText}
-              >
-                {item.text} — {item.dueDate} — {item.priority}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.taskText}>
+                {` ${item.text}\n Due: ${item.dueDate}\n Priority: ${item.priority}`}
               </Text>
-            </TouchableOpacity>
+            </View>
             <Button title="Delete" onPress={() => deleteTask(item.id)} />
           </View>
         )}
@@ -136,17 +181,19 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 10,
   },
+  dateButton: {
+    backgroundColor: "#eee",
+    padding: 10,
+    borderRadius: 5,
+    marginBottom: 10,
+  },
+  dateText: { fontSize: 16 },
   picker: { marginBottom: 10 },
   taskContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
+    alignItems: "flex-start",
+    marginBottom: 15,
   },
   taskText: { fontSize: 16 },
-  completedTask: {
-    fontSize: 16,
-    textDecorationLine: "line-through",
-    color: "gray",
-  },
 });
