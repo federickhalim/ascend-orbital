@@ -12,6 +12,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
+import { ScrollView } from "react-native";
 
 interface Task {
   id: string;
@@ -80,7 +81,11 @@ export default function PlannerPage() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: 30 }}
+      keyboardShouldPersistTaps="handled"
+    >
       <Text style={styles.title}>Planner</Text>
 
       <TextInput
@@ -153,21 +158,17 @@ export default function PlannerPage() {
         <Picker.Item label="Priority" value="priority" />
       </Picker>
 
-      <FlatList
-        data={getSortedTasks()}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.taskContainer}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.taskText}>
-                {` ${item.text}\n Due: ${item.dueDate}\n Priority: ${item.priority}`}
-              </Text>
-            </View>
-            <Button title="Delete" onPress={() => deleteTask(item.id)} />
+      {getSortedTasks().map((item) => (
+        <View key={item.id} style={styles.taskContainer}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.taskText}>
+              {` ${item.text}\n Due: ${item.dueDate}\n Priority: ${item.priority}`}
+            </Text>
           </View>
-        )}
-      />
-    </View>
+          <Button title="Delete" onPress={() => deleteTask(item.id)} />
+        </View>
+      ))}
+    </ScrollView>
   );
 }
 
