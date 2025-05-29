@@ -10,8 +10,8 @@ const eras = [
     image: require("../assets/images/egypt.jpeg"),
   },
   {
-    key: "medieval",
-    name: "Medieval Europe",
+    key: "renaissance",
+    name: "Renaissance",
     unlockHour: 300,
     image: require("../assets/images/renaissance.jpg"),
   },

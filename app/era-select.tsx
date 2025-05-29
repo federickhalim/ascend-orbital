@@ -1,11 +1,12 @@
 import { View, StyleSheet, Animated } from "react-native";
 import { useEffect, useRef } from "react";
 import EraScroll from "@/components/EraScroll";
-import useUserStats from "@/hooks/useUserStats";
+import { useLocalSearchParams } from "expo-router";
 
 export default function EraSelectScreen() {
-  const userId = "demo-user";
-  const { focusTime } = useUserStats(userId);
+  const { time } = useLocalSearchParams();
+  const focusTime = parseInt(time as string) || 0;
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
