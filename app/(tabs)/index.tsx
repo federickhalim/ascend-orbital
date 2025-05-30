@@ -211,7 +211,8 @@ export default function HomeScreen() {
         <Text style={styles.statText}>🔥 Streak: {streak} day(s)</Text>
         <Text style={styles.statText}>
           ⏳ Total: {Math.floor(totalFocusTime / 3600)}h{" "}
-          {Math.floor((totalFocusTime % 3600) / 60)}m / 1000h
+          {Math.floor((totalFocusTime % 3600) / 60)}m {totalFocusTime % 60}s /
+          1000h
         </Text>
       </View>
 
