@@ -14,6 +14,7 @@ import { useRouter } from "expo-router";
 const router = useRouter();
 import { Animated, Easing } from "react-native";
 import { useRef } from "react";
+import AncientMap from "@/components/AncientMap";
 
 type ModeType = "stopwatch" | "pomodoro";
 type PomodoroPhase = "focus" | "break";
@@ -225,13 +226,9 @@ export default function HomeScreen() {
           })
         }
       >
-        <Animated.View style={{ transform: [{ translateY: floatAnim }] }}>
-          <Image
-            source={require("../../assets/images/character.png")}
-            style={styles.character}
-            resizeMode="contain"
-          />
-        </Animated.View>
+        <View style={{ marginLeft: 260, marginTop: 70, marginBottom: -80 }}>
+          <AncientMap totalFocusTime={totalFocusTime} />
+        </View>
       </TouchableOpacity>
 
       {/* Timer */}
