@@ -226,7 +226,7 @@ export default function HomeScreen() {
           })
         }
       >
-        <View style={{ marginLeft: 260, marginTop: 70, marginBottom: -80 }}>
+        <View style={{ marginLeft: 280, marginTop: 90, marginBottom: -80 }}>
           <AncientMap totalFocusTime={totalFocusTime} />
         </View>
       </TouchableOpacity>

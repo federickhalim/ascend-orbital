@@ -88,7 +88,9 @@ const styles = StyleSheet.create({
     position: "relative",
     width: GRID_SIZE * TILE_WIDTH,
     height: GRID_SIZE * TILE_HEIGHT * 2,
+    transform: [{ scale: 0.3 }],
   },
+
   tile: {
     position: "absolute",
   },
