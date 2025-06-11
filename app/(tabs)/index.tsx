@@ -1,20 +1,20 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
-  Button,
   StyleSheet,
   TouchableOpacity,
-  Image,
+  Animated,
+  Easing,
 } from "react-native";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/firebaseConfig";
 import dayjs from "dayjs";
 import { useRouter } from "expo-router";
-const router = useRouter();
-import { Animated, Easing } from "react-native";
-import { useRef } from "react";
 import AncientMap from "@/components/AncientMap";
+import RenaissanceMap from "@/components/RenaissanceMap";
+
+const router = useRouter();
 
 type ModeType = "stopwatch" | "pomodoro";
 type PomodoroPhase = "focus" | "break";
@@ -36,9 +36,27 @@ export default function HomeScreen() {
   const POMODORO_DURATION = 25 * 60;
   const BREAK_DURATION = 5 * 60;
   const userId = "demo-user";
+
   const floatAnim = useRef(new Animated.Value(0)).current;
 
-  // for character animation
+  // this is for testing (uncomment and run only once!)
+  /*
+  useEffect(() => {
+    const resetFocusTime = async () => {
+      const userRef = doc(db, "users", "demo-user");
+      await setDoc(
+        userRef,
+        {
+          totalFocusTime: 1080, // change to '18000000' to view renaissance eras
+        },
+        { merge: true }
+      );
+      console.log("Focus time reset to 18 minutes");
+    };
+
+    resetFocusTime();
+  }, []);
+*/
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
@@ -205,6 +223,9 @@ export default function HomeScreen() {
     setMode((prev) => (prev === "stopwatch" ? "pomodoro" : "stopwatch"));
   };
 
+  // transition from Ancient to Renaissance map
+  const MapComponent = totalFocusTime >= 3600000 ? RenaissanceMap : AncientMap;
+
   return (
     <View style={styles.container}>
       {/* Top Stats */}
@@ -217,7 +238,7 @@ export default function HomeScreen() {
         </Text>
       </View>
 
-      {/* Character */}
+      {/* Character Map */}
       <TouchableOpacity
         onPress={() =>
           router.push({
@@ -226,18 +247,16 @@ export default function HomeScreen() {
           })
         }
       >
-        <View style={{ marginLeft: 280, marginTop: 90, marginBottom: -80 }}>
-          <AncientMap totalFocusTime={totalFocusTime} />
+        <View style={{ marginTop: -10, marginBottom: -120 }}>
+          <MapComponent totalFocusTime={totalFocusTime} />
         </View>
       </TouchableOpacity>
-
       {/* Timer */}
       <Text style={styles.timer}>
         {mode === "stopwatch"
           ? formatTime(elapsedTime)
           : formatTime(remainingTime)}
       </Text>
-
       {/* Buttons */}
       <View style={styles.buttonRow}>
         <TouchableOpacity
@@ -254,7 +273,6 @@ export default function HomeScreen() {
           <Text style={styles.buttonText}>Reset</Text>
         </TouchableOpacity>
       </View>
-
       <TouchableOpacity
         style={[styles.button, styles.mode]}
         onPress={toggleMode}
@@ -288,28 +306,23 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
-    elevation: 5, // Android shadow
+    elevation: 5,
   },
   statText: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#4b2e83", // royal purple
+    color: "#4b2e83",
     textAlign: "center",
     marginVertical: 4,
     textShadowColor: "#fff",
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 1,
   },
-
-  character: {
-    width: 200,
-    height: 200,
-    marginBottom: 20,
-  },
   timer: {
     fontSize: 64,
     fontWeight: "bold",
-    marginVertical: 20,
+    marginTop: 10,
+    marginBottom: 20,
     color: "#333",
   },
   buttonRow: {
