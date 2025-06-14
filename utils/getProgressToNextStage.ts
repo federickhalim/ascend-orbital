@@ -1,41 +1,56 @@
 import {
   SECONDS_PER_LEVEL,
+  LEVELS_PER_ERA,
   ANCIENT_START,
+  ANCIENT_END,
   RENAISSANCE_START,
+  RENAISSANCE_END,
 } from "@/config/eraThresholdConfig";
 
 export function getProgressToNextStage(focusTime: number) {
-  const ANCIENT_END = RENAISSANCE_START;
-  const RENAISSANCE_END = RENAISSANCE_START + 3 * SECONDS_PER_LEVEL;
-
-  // Ancient Era
+  // 🏺 Ancient Era (includes extended final stage up to RENAISSANCE_START)
   if (focusTime < RENAISSANCE_START) {
-    const currentLevel = Math.floor((focusTime - ANCIENT_START) / SECONDS_PER_LEVEL);
-    const stageStart = ANCIENT_START + currentLevel * SECONDS_PER_LEVEL;
-    const stageEnd = stageStart + SECONDS_PER_LEVEL;
+    const rawLevel = Math.floor((focusTime - ANCIENT_START) / SECONDS_PER_LEVEL);
+    const currentLevel = Math.min(rawLevel, LEVELS_PER_ERA - 1);
 
-    const isLastStage = stageEnd >= RENAISSANCE_START;
+    const stageStart = ANCIENT_START + currentLevel * SECONDS_PER_LEVEL;
+    const stageEnd =
+      currentLevel === LEVELS_PER_ERA - 1
+        ? RENAISSANCE_START
+        : stageStart + SECONDS_PER_LEVEL;
+
     return {
       current: focusTime - stageStart,
-      max: SECONDS_PER_LEVEL,
-      label: isLastStage
-        ? "Progress to Renaissance Era"
-        : "Progress to next Ancient Egypt upgrade",
+      max: stageEnd - stageStart,
+      label:
+        currentLevel === LEVELS_PER_ERA - 1
+          ? "Progress to Renaissance Era"
+          : "Progress to next Ancient Egypt upgrade",
     };
   }
 
-  // Renaissance Era
-  const currentLevel = Math.floor((focusTime - RENAISSANCE_START) / SECONDS_PER_LEVEL);
-  const stageStart = RENAISSANCE_START + currentLevel * SECONDS_PER_LEVEL;
-  const stageEnd = stageStart + SECONDS_PER_LEVEL;
+  // 🎭 Renaissance Era
+  if (focusTime < RENAISSANCE_END) {
+    const currentLevel = Math.floor((focusTime - RENAISSANCE_START) / SECONDS_PER_LEVEL);
+    const clampedLevel = Math.min(currentLevel, LEVELS_PER_ERA - 1);
 
-  const isLastStage = stageEnd >= RENAISSANCE_START + 3 * SECONDS_PER_LEVEL;
+    const stageStart = RENAISSANCE_START + clampedLevel * SECONDS_PER_LEVEL;
+    const stageEnd = stageStart + SECONDS_PER_LEVEL;
+
+    return {
+      current: focusTime - stageStart,
+      max: stageEnd - stageStart,
+      label:
+        clampedLevel === LEVELS_PER_ERA - 1
+          ? "Progress to Future Era"
+          : "Progress to next Renaissance upgrade",
+    };
+  }
+
+  // 🛸 Future Eras (Fallback)
   return {
-    current: focusTime - stageStart,
-    max: SECONDS_PER_LEVEL,
-    label: isLastStage
-      ? "Final Renaissance stage reached!"
-      : "Progress to next Renaissance upgrade",
+    current: 1,
+    max: 1,
+    label: "Future Era coming soon!",
   };
 }
-

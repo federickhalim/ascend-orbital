@@ -1,6 +1,14 @@
-export const SECONDS_PER_LEVEL = 10;
+export const SECONDS_PER_LEVEL = 5; 
+
+export const LEVELS_PER_ERA = 3;
 
 export const ANCIENT_START = 0;
-export const RENAISSANCE_START = 30;
+export const ANCIENT_END = ANCIENT_START + LEVELS_PER_ERA * SECONDS_PER_LEVEL;
 
-// Add future eras here later
+export const RENAISSANCE_START = 30; // or ANCIENT_END + gap if needed
+export const RENAISSANCE_END = RENAISSANCE_START + LEVELS_PER_ERA * SECONDS_PER_LEVEL;
+
+// Future eras
+// export const FUTURE_START = RENAISSANCE_END + 60 OR WHATEVER JUST MAKE SURE IT IS MORE THAN OR EQUAL TO RENAISSANCE_END;
+// export const FUTURE_END = FUTURE_START + LEVELS_PER_ERA * SECONDS_PER_LEVEL;
+
