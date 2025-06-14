@@ -1,138 +1,103 @@
-import React from "react";
-import { View, Image, StyleSheet, Animated, Easing } from "react-native";
-import { useRef, useEffect } from "react";
-
+import React, { useEffect, useRef, useState } from "react";
+import {
+  View,
+  Image,
+  Animated,
+  StyleSheet,
+  Easing,
+} from "react-native";
 import { renaissanceEraAssets } from "@/config/renaissanceEraConfig";
+import { RENAISSANCE_START, SECONDS_PER_LEVEL } from "@/config/eraThresholdConfig";
 
 interface RenaissanceMapProps {
-  totalFocusTime: number; // in seconds
+  totalFocusTime: number;
 }
 
-const GRID_SIZE = 5;
+const MAX_MAP_WIDTH = 320;
+const ASSET_SIZE = 180; 
+const HALF_SIZE = ASSET_SIZE / 2;
 
-export default function RenaissanceMap({
-  totalFocusTime,
-}: RenaissanceMapProps) {
-  const MAX_MAP_WIDTH = 320;
-  const TILE_WIDTH = MAX_MAP_WIDTH / GRID_SIZE;
-  const TILE_HEIGHT = TILE_WIDTH / 2;
-  const mapCenterOffsetX = (TILE_WIDTH * GRID_SIZE) / 2;
+export default function RenaissanceMap({ totalFocusTime }: RenaissanceMapProps) {
+  const [unlockedAssets, setUnlockedAssets] = useState<string[]>([]);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const opacityAnim = useRef(new Animated.Value(1)).current;
 
-  // owl animation
-  const owlFloatAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(owlFloatAnim, {
-          toValue: -6,
-          duration: 1000,
-          useNativeDriver: true,
-          easing: Easing.inOut(Easing.quad),
-        }),
-        Animated.timing(owlFloatAnim, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: true,
-          easing: Easing.inOut(Easing.quad),
-        }),
-      ])
-    ).start();
-  }, []);
-
-  // griffin animation
-  const griffinFloatAnim = useRef(new Animated.Value(0)).current;
+  const relativeFocusTime = totalFocusTime - RENAISSANCE_START;
+  const eraLevel = Math.min(3, Math.floor(relativeFocusTime / SECONDS_PER_LEVEL) + 1);
 
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(griffinFloatAnim, {
-          toValue: 6,
-          duration: 1000,
+    const newlyUnlocked = renaissanceEraAssets.filter(
+      (asset) =>
+        !unlockedAssets.includes(asset.name) &&
+        totalFocusTime >= SECONDS_PER_LEVEL
+    );
+
+    if (newlyUnlocked.length > 0) {
+      const newNames = newlyUnlocked.map((a) => a.name);
+      setUnlockedAssets((prev) => [...prev, ...newNames]);
+
+      scaleAnim.setValue(0.3);
+      opacityAnim.setValue(0);
+
+      Animated.parallel([
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.out(Easing.exp),
           useNativeDriver: true,
-          easing: Easing.inOut(Easing.quad),
         }),
-        Animated.timing(griffinFloatAnim, {
-          toValue: -6,
-          duration: 1000,
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.out(Easing.exp),
           useNativeDriver: true,
-          easing: Easing.inOut(Easing.quad),
         }),
-      ])
-    ).start();
-  }, []);
+      ]).start();
+    }
+  }, [totalFocusTime]);
 
   const tiles = [];
 
-  // Base tiles
-  for (let row = 0; row < GRID_SIZE; row++) {
-    for (let col = 0; col < GRID_SIZE; col++) {
-      const top = (row + col) * (TILE_HEIGHT / 2);
-      const left =
-        (col - row) * (TILE_WIDTH / 2) + mapCenterOffsetX - TILE_WIDTH / 2;
+  // Add base tile
+  tiles.push(
+    <Image
+      key="base"
+      source={require("@/assets/images/renaissance-assets/renaissance-base.png")}
+      style={{
+        width: MAX_MAP_WIDTH,
+        height: (MAX_MAP_WIDTH * 3) / 4,
+        position: "absolute",
+        top: 0,
+        left: 0,
+        zIndex: 0,
+      }}
+    />
+  );
 
-      tiles.push(
-        <Image
-          key={`base-${row}-${col}`}
-          source={require("@/assets/images/renaissance-assets/base2.png")}
-          style={{
-            position: "absolute",
-            top: top - 0.5,
-            left: left - 0.5,
-            width: TILE_WIDTH + 1,
-            height: TILE_HEIGHT + 1,
-            zIndex: row + col,
-          }}
-        />
-      );
-    }
-  }
-
-  // Unlock assets
+  // Render assets
   renaissanceEraAssets.forEach((asset) => {
-    if (totalFocusTime >= asset.threshold) {
-      const ASSET_SCALE = 1.9;
-      const top =
-        (asset.row + asset.col) * (TILE_HEIGHT / 2) -
-        TILE_HEIGHT * (ASSET_SCALE - 1);
-      const left =
-        (asset.col - asset.row) * (TILE_WIDTH / 2) -
-        (TILE_WIDTH * (ASSET_SCALE - 1)) / 2 +
-        mapCenterOffsetX -
-        TILE_WIDTH / 2;
+    const isJustUnlocked = unlockedAssets.includes(asset.name);
 
-      const commonStyle = {
-        position: "absolute" as const,
-        top,
-        left,
-        width: TILE_WIDTH * ASSET_SCALE,
-        height: TILE_HEIGHT * ASSET_SCALE,
-        zIndex: asset.name === "owl" ? 101 : 100,
-      };
-
-      const isAnimated =
-        (asset.name === "owl" || asset.name === "griffin") &&
-        totalFocusTime >= 3600000;
-      // change unlock renaissance era time acc
-
-      tiles.push(
-        isAnimated ? (
-          <Animated.Image
-            key={asset.name}
-            source={asset.image}
-            style={{
-              ...commonStyle,
-              transform:
-                asset.name === "owl"
-                  ? [{ translateY: owlFloatAnim }]
-                  : [{ translateX: griffinFloatAnim }],
-            }}
-          />
-        ) : (
-          <Image key={asset.name} source={asset.image} style={commonStyle} />
-        )
-      );
-    }
+    tiles.push(
+      <Animated.Image
+        key={asset.name}
+        source={asset.images[eraLevel]}
+        style={{
+          position: "absolute",
+          top: asset.top,
+          left: asset.left,
+          width: ASSET_SIZE,
+          height: ASSET_SIZE,
+          zIndex: 100,
+          transform: [
+            { translateX: -HALF_SIZE },
+            { translateY: -HALF_SIZE },
+            { scale: isJustUnlocked ? scaleAnim : 1 },
+          ],
+          opacity: isJustUnlocked ? opacityAnim : 1,
+        }}
+      />
+    );
   });
 
   return (
@@ -141,7 +106,7 @@ export default function RenaissanceMap({
         style={{
           position: "relative",
           width: MAX_MAP_WIDTH,
-          height: TILE_HEIGHT * GRID_SIZE * 2,
+          height: (MAX_MAP_WIDTH * 3) / 4,
         }}
       >
         {tiles}

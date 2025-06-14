@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Animated,
   Easing,
+  DimensionValue
 } from "react-native";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/firebaseConfig";
@@ -13,6 +14,7 @@ import dayjs from "dayjs";
 import { useRouter } from "expo-router";
 import AncientMap from "@/components/AncientMap";
 import RenaissanceMap from "@/components/RenaissanceMap";
+import { getProgressToNextStage } from "@/utils/getProgressToNextStage";
 
 const router = useRouter();
 
@@ -25,6 +27,8 @@ export default function HomeScreen() {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [prevElapsedTime, setPrevElapsedTime] = useState(0);
   const [totalFocusTime, setTotalFocusTime] = useState(0);
+  const [sessionTime, setSessionTime] = useState(0); // New live-tracking session timer
+
   const [pomodoroPhase, setPomodoroPhase] = useState<PomodoroPhase>("focus");
   const [prevRemainingTime, setPrevRemainingTime] = useState(25 * 60);
   const [remainingTime, setRemainingTime] = useState(25 * 60);
@@ -39,24 +43,6 @@ export default function HomeScreen() {
 
   const floatAnim = useRef(new Animated.Value(0)).current;
 
-  // this is for testing (uncomment and run only once!)
-  /*
-  useEffect(() => {
-    const resetFocusTime = async () => {
-      const userRef = doc(db, "users", "demo-user");
-      await setDoc(
-        userRef,
-        {
-          totalFocusTime: 1080, // change to '18000000' to view renaissance eras
-        },
-        { merge: true }
-      );
-      console.log("Focus time reset to 18 minutes");
-    };
-
-    resetFocusTime();
-  }, []);
-*/
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
@@ -87,6 +73,14 @@ export default function HomeScreen() {
           setTotalFocusTime(data.totalFocusTime || 0);
           setStreak(data.streak || 0);
           setLastStudyDate(data.lastStudyDate || "");
+
+          // Check if streak should be reset based on inactivity
+          const today = dayjs().format("YYYY-MM-DD");
+          const yesterday = dayjs().subtract(1, "day").format("YYYY-MM-DD");
+
+          if (data.lastStudyDate && data.lastStudyDate !== today && data.lastStudyDate !== yesterday) {
+            setStreak(0); // Temporarily show 0 on load
+          }
         }
         setHasLoadedFromFirestore(true);
       } catch (error) {
@@ -124,8 +118,10 @@ export default function HomeScreen() {
       interval = setInterval(() => {
         if (mode === "stopwatch") {
           setElapsedTime((prev) => prev + 1);
+          setSessionTime((prev) => prev + 1);
         } else {
           setRemainingTime((prev) => (prev <= 1 ? 0 : prev - 1));
+          setSessionTime((prev) => prev + 1);
         }
       }, 1000);
     }
@@ -147,22 +143,23 @@ export default function HomeScreen() {
         setPomodoroPhase("focus");
         setRemainingTime(POMODORO_DURATION);
       }
+      setSessionTime(0);
       setIsRunning(false);
     }
   }, [remainingTime, isRunning, mode, pomodoroPhase]);
-
-  useEffect(() => {
-    if (!hasLoadedFromFirestore || !lastStudyDate) return;
-    const today = dayjs().format("YYYY-MM-DD");
-    if (lastStudyDate !== today) updateStreak();
-  }, [hasLoadedFromFirestore, lastStudyDate]);
 
   const updateStreak = () => {
     const today = dayjs().format("YYYY-MM-DD");
     const yesterday = dayjs().subtract(1, "day").format("YYYY-MM-DD");
 
     if (lastStudyDate === today) return;
-    setStreak((prev) => (lastStudyDate === yesterday ? prev + 1 : 1));
+
+    if (lastStudyDate === yesterday) {
+      setStreak((prev) => prev + 1);
+    } else {
+      setStreak(1);
+    }
+
     setLastStudyDate(today);
   };
 
@@ -177,6 +174,7 @@ export default function HomeScreen() {
   const handleStartStop = () => {
     if (isRunning) {
       setIsRunning(false);
+      setSessionTime(0);
       if (mode === "stopwatch") {
         const delta = elapsedTime - prevElapsedTime;
         if (delta > 0) {
@@ -204,6 +202,7 @@ export default function HomeScreen() {
 
   const handleReset = () => {
     setIsRunning(false);
+    setSessionTime(0);
     setElapsedTime(0);
     setPrevElapsedTime(0);
     setPomodoroPhase("focus");
@@ -215,6 +214,7 @@ export default function HomeScreen() {
 
   const toggleMode = () => {
     setIsRunning(false);
+    setSessionTime(0);
     setPomodoroPhase("focus");
     setRemainingTime(POMODORO_DURATION);
     setPrevRemainingTime(POMODORO_DURATION);
@@ -223,8 +223,10 @@ export default function HomeScreen() {
     setMode((prev) => (prev === "stopwatch" ? "pomodoro" : "stopwatch"));
   };
 
-  // transition from Ancient to Renaissance map
-  const MapComponent = totalFocusTime >= 3600000 ? RenaissanceMap : AncientMap;
+  const liveFocusTime = totalFocusTime + sessionTime;
+  const { current, max, label } = getProgressToNextStage(liveFocusTime);
+  const progressPercent = Math.min(current / max, 1);
+  const MapComponent = liveFocusTime >= 30 ? RenaissanceMap : AncientMap;
 
   return (
     <View style={styles.container}>
@@ -232,31 +234,49 @@ export default function HomeScreen() {
       <View style={styles.statsBar}>
         <Text style={styles.statText}>🔥 Streak: {streak} day(s)</Text>
         <Text style={styles.statText}>
-          ⏳ Total: {Math.floor(totalFocusTime / 3600)}h{" "}
-          {Math.floor((totalFocusTime % 3600) / 60)}m {totalFocusTime % 60}s /
-          1000h
+          ⏳ Total: {Math.floor(liveFocusTime / 3600)}h{" "}
+          {Math.floor((liveFocusTime % 3600) / 60)}m {liveFocusTime % 60}s
         </Text>
+
+        {/* ✅ Embedded Progress Bar */}
+        <View style={styles.progressWrapper}>
+          <Text style={styles.progressLabel}>{label}</Text>
+          <View style={styles.progressBar}>
+            <View
+              style={[
+                styles.progressFill,
+                { width: `${(progressPercent * 100).toFixed(1)}%` as DimensionValue },
+              ]}
+            />
+          </View>
+          <Text style={styles.progressText}>
+            {Math.floor(current)}s / {max}s
+          </Text>
+        </View>
       </View>
+
 
       {/* Character Map */}
       <TouchableOpacity
         onPress={() =>
           router.push({
             pathname: "/era-select",
-            params: { time: totalFocusTime.toString() },
+            params: { time: liveFocusTime.toString() },
           })
         }
       >
-        <View style={{ marginTop: -10, marginBottom: -120 }}>
-          <MapComponent totalFocusTime={totalFocusTime} />
+        <View style={{ marginTop: -50, marginBottom: 10, alignItems: "center" }}>
+          <MapComponent totalFocusTime={liveFocusTime} />
         </View>
       </TouchableOpacity>
+
       {/* Timer */}
       <Text style={styles.timer}>
         {mode === "stopwatch"
           ? formatTime(elapsedTime)
           : formatTime(remainingTime)}
       </Text>
+
       {/* Buttons */}
       <View style={styles.buttonRow}>
         <TouchableOpacity
@@ -273,6 +293,7 @@ export default function HomeScreen() {
           <Text style={styles.buttonText}>Reset</Text>
         </TouchableOpacity>
       </View>
+
       <TouchableOpacity
         style={[styles.button, styles.mode]}
         onPress={toggleMode}
@@ -352,5 +373,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
     textAlign: "center",
+  },
+  progressWrapper: {
+    width: "100%",
+    marginTop: 12,
+    alignItems: "center",
+  },
+  progressLabel: {
+    fontSize: 14,
+    marginBottom: 4,
+    color: "#4b2e83",
+    fontWeight: "500",
+  },
+  progressBar: {
+    width: "100%",
+    height: 10,
+    backgroundColor: "#e0e0e0",
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: "#4caf50",
+    borderRadius: 10,
+  },
+  progressText: {
+    fontSize: 13,
+    marginTop: 2,
+    color: "#4b2e83",
+    fontWeight: "500",
   },
 });
