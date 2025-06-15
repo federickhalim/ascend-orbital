@@ -1,8 +1,22 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, Button, StyleSheet, TouchableOpacity } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Animated,
+  Easing,
+  DimensionValue
+} from "react-native";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/firebaseConfig";
 import dayjs from "dayjs";
+import { useRouter } from "expo-router";
+import AncientMap from "@/components/AncientMap";
+import RenaissanceMap from "@/components/RenaissanceMap";
+import { getProgressToNextStage } from "@/utils/getProgressToNextStage";
+
+const router = useRouter();
 
 type ModeType = "stopwatch" | "pomodoro";
 type PomodoroPhase = "focus" | "break";
@@ -13,8 +27,11 @@ export default function HomeScreen() {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [prevElapsedTime, setPrevElapsedTime] = useState(0);
   const [totalFocusTime, setTotalFocusTime] = useState(0);
+  const [sessionTime, setSessionTime] = useState(0); // New live-tracking session timer
+
   const [pomodoroPhase, setPomodoroPhase] = useState<PomodoroPhase>("focus");
   const [prevRemainingTime, setPrevRemainingTime] = useState(25 * 60);
+  const [remainingTime, setRemainingTime] = useState(25 * 60);
 
   const [streak, setStreak] = useState(0);
   const [lastStudyDate, setLastStudyDate] = useState("");
@@ -23,6 +40,27 @@ export default function HomeScreen() {
   const POMODORO_DURATION = 25 * 60;
   const BREAK_DURATION = 5 * 60;
   const userId = "demo-user";
+
+  const floatAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: -10,
+          duration: 1000,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.quad),
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.quad),
+        }),
+      ])
+    ).start();
+  }, []);
 
   useEffect(() => {
     const fetchFocusTime = async () => {
@@ -35,8 +73,15 @@ export default function HomeScreen() {
           setTotalFocusTime(data.totalFocusTime || 0);
           setStreak(data.streak || 0);
           setLastStudyDate(data.lastStudyDate || "");
-        }
 
+          // Check if streak should be reset based on inactivity
+          const today = dayjs().format("YYYY-MM-DD");
+          const yesterday = dayjs().subtract(1, "day").format("YYYY-MM-DD");
+
+          if (data.lastStudyDate && data.lastStudyDate !== today && data.lastStudyDate !== yesterday) {
+            setStreak(0); // Temporarily show 0 on load
+          }
+        }
         setHasLoadedFromFirestore(true);
       } catch (error) {
         console.error("Error fetching focus time:", error);
@@ -48,7 +93,6 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (!hasLoadedFromFirestore) return;
-
     const saveFocusTime = async () => {
       try {
         const userRef = doc(db, "users", userId);
@@ -65,38 +109,29 @@ export default function HomeScreen() {
         console.error("Error saving focus time:", error);
       }
     };
-
     saveFocusTime();
   }, [totalFocusTime, streak, lastStudyDate, hasLoadedFromFirestore]);
 
-  const [remainingTime, setRemainingTime] = useState(POMODORO_DURATION);
-
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
-
     if (isRunning) {
       interval = setInterval(() => {
         if (mode === "stopwatch") {
           setElapsedTime((prev) => prev + 1);
+          setSessionTime((prev) => prev + 1);
         } else {
-          setRemainingTime((prev) => {
-            if (prev <= 1) {
-              clearInterval(interval);
-              return 0;
-            }
-            return prev - 1;
-          });
+          setRemainingTime((prev) => (prev <= 1 ? 0 : prev - 1));
+          setSessionTime((prev) => prev + 1);
         }
       }, 1000);
     }
-
     return () => clearInterval(interval);
   }, [isRunning, mode]);
 
   useEffect(() => {
     if (!isRunning || mode !== "pomodoro") return;
-
-    const duration = pomodoroPhase === "focus" ? POMODORO_DURATION : BREAK_DURATION;
+    const duration =
+      pomodoroPhase === "focus" ? POMODORO_DURATION : BREAK_DURATION;
 
     if (remainingTime === 0) {
       if (pomodoroPhase === "focus") {
@@ -108,60 +143,57 @@ export default function HomeScreen() {
         setPomodoroPhase("focus");
         setRemainingTime(POMODORO_DURATION);
       }
+      setSessionTime(0);
       setIsRunning(false);
     }
   }, [remainingTime, isRunning, mode, pomodoroPhase]);
-
-  useEffect(() => {
-    if (!hasLoadedFromFirestore || !lastStudyDate) return;
-    const today = dayjs().format("YYYY-MM-DD");
-    if (lastStudyDate !== today) {
-      updateStreak();
-    }
-  }, [hasLoadedFromFirestore, lastStudyDate]);
 
   const updateStreak = () => {
     const today = dayjs().format("YYYY-MM-DD");
     const yesterday = dayjs().subtract(1, "day").format("YYYY-MM-DD");
 
     if (lastStudyDate === today) return;
+
     if (lastStudyDate === yesterday) {
       setStreak((prev) => prev + 1);
     } else {
       setStreak(1);
     }
+
     setLastStudyDate(today);
   };
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+    return `${mins.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`;
   };
 
   const handleStartStop = () => {
     if (isRunning) {
       setIsRunning(false);
-
+      setSessionTime(0);
       if (mode === "stopwatch") {
         const delta = elapsedTime - prevElapsedTime;
         if (delta > 0) {
           setTotalFocusTime((prev) => prev + delta);
           updateStreak();
         }
-        setPrevElapsedTime(elapsedTime); // ✅ fix: update checkpoint
+        setPrevElapsedTime(elapsedTime);
       } else if (mode === "pomodoro" && pomodoroPhase === "focus") {
         const timeSpent = prevRemainingTime - remainingTime;
         if (timeSpent > 0) {
           setTotalFocusTime((prev) => prev + timeSpent);
           updateStreak();
         }
-        setPrevRemainingTime(remainingTime); // ✅ fix: update checkpoint
+        setPrevRemainingTime(remainingTime);
       }
     } else {
       if (mode === "stopwatch") {
         setPrevElapsedTime(elapsedTime);
-      } else if (mode === "pomodoro") {
+      } else {
         setPrevRemainingTime(remainingTime);
       }
       setIsRunning(true);
@@ -170,6 +202,7 @@ export default function HomeScreen() {
 
   const handleReset = () => {
     setIsRunning(false);
+    setSessionTime(0);
     setElapsedTime(0);
     setPrevElapsedTime(0);
     setPomodoroPhase("focus");
@@ -181,6 +214,7 @@ export default function HomeScreen() {
 
   const toggleMode = () => {
     setIsRunning(false);
+    setSessionTime(0);
     setPomodoroPhase("focus");
     setRemainingTime(POMODORO_DURATION);
     setPrevRemainingTime(POMODORO_DURATION);
@@ -189,39 +223,85 @@ export default function HomeScreen() {
     setMode((prev) => (prev === "stopwatch" ? "pomodoro" : "stopwatch"));
   };
 
+  const liveFocusTime = totalFocusTime + sessionTime;
+  const { current, max, label } = getProgressToNextStage(liveFocusTime);
+  const progressPercent = Math.min(current / max, 1);
+  const MapComponent = liveFocusTime >= 30 ? RenaissanceMap : AncientMap;
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>
-        Focus Mode: {mode === "stopwatch" ? "Stopwatch" : `Pomodoro (${pomodoroPhase})`}
+      {/* Top Stats */}
+      <View style={styles.statsBar}>
+        <Text style={styles.statText}>🔥 Streak: {streak} day(s)</Text>
+        <Text style={styles.statText}>
+          ⏳ Total: {Math.floor(liveFocusTime / 3600)}h{" "}
+          {Math.floor((liveFocusTime % 3600) / 60)}m {liveFocusTime % 60}s
+        </Text>
+
+        {/* ✅ Embedded Progress Bar */}
+        <View style={styles.progressWrapper}>
+          <Text style={styles.progressLabel}>{label}</Text>
+          <View style={styles.progressBar}>
+            <View
+              style={[
+                styles.progressFill,
+                { width: `${(progressPercent * 100).toFixed(1)}%` as DimensionValue },
+              ]}
+            />
+          </View>
+          <Text style={styles.progressText}>
+            {Math.floor(current)}s / {max}s
+          </Text>
+        </View>
+      </View>
+
+
+      {/* Character Map */}
+      <TouchableOpacity
+        onPress={() =>
+          router.push({
+            pathname: "/era-select",
+            params: { time: liveFocusTime.toString() },
+          })
+        }
+      >
+        <View style={{ marginTop: -50, marginBottom: 10, alignItems: "center" }}>
+          <MapComponent totalFocusTime={liveFocusTime} />
+        </View>
+      </TouchableOpacity>
+
+      {/* Timer */}
+      <Text style={styles.timer}>
+        {mode === "stopwatch"
+          ? formatTime(elapsedTime)
+          : formatTime(remainingTime)}
       </Text>
 
-      <TouchableOpacity onPress={toggleMode} style={styles.toggleButton}>
-        <Text style={styles.toggleText}>
+      {/* Buttons */}
+      <View style={styles.buttonRow}>
+        <TouchableOpacity
+          style={[styles.button, isRunning ? styles.stop : styles.start]}
+          onPress={handleStartStop}
+        >
+          <Text style={styles.buttonText}>{isRunning ? "Stop" : "Start"}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, styles.reset]}
+          onPress={handleReset}
+        >
+          <Text style={styles.buttonText}>Reset</Text>
+        </TouchableOpacity>
+      </View>
+
+      <TouchableOpacity
+        style={[styles.button, styles.mode]}
+        onPress={toggleMode}
+      >
+        <Text style={styles.buttonText}>
           Switch to {mode === "stopwatch" ? "Pomodoro" : "Stopwatch"}
         </Text>
       </TouchableOpacity>
-
-      <Text style={styles.timer}>
-        {mode === "stopwatch" ? formatTime(elapsedTime) : formatTime(remainingTime)}
-      </Text>
-
-      <View style={styles.buttonContainer}>
-        <Button
-          title={isRunning ? "Stop" : "Start"}
-          onPress={handleStartStop}
-          color={isRunning ? "#d9534f" : "#5cb85c"}
-        />
-        <View style={{ width: 20 }} />
-        <Button title="Reset" onPress={handleReset} color="#f0ad4e" />
-      </View>
-
-      <Text style={styles.totalLabel}>Total Focus Time:</Text>
-      <Text style={styles.total}>{formatTime(totalFocusTime)}</Text>
-
-      <Text style={styles.totalLabel}>Current Streak:</Text>
-      <Text style={styles.total}>
-        {streak} {streak === 1 ? "day" : "days"}
-      </Text>
     </View>
   );
 }
@@ -229,40 +309,98 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
+    paddingTop: 60,
+    backgroundColor: "#f7f7f7",
     alignItems: "center",
+  },
+  statsBar: {
+    width: "90%",
+    backgroundColor: "#fff8dc",
+    borderRadius: 16,
+    paddingVertical: 12,
     paddingHorizontal: 20,
+    marginTop: -40,
+    marginBottom: 50,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
-  toggleButton: {
-    marginBottom: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    backgroundColor: "#007bff",
-    borderRadius: 8,
-  },
-  buttonContainer: {
-    flexDirection: "row",
-    marginTop: 20,
-  },
-  toggleText: {
-    color: "#fff",
-    fontWeight: "bold",
+  statText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#4b2e83",
+    textAlign: "center",
+    marginVertical: 4,
+    textShadowColor: "#fff",
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 1,
   },
   timer: {
-    fontSize: 48,
-    marginVertical: 20,
+    fontSize: 64,
+    fontWeight: "bold",
+    marginTop: 10,
+    marginBottom: 20,
+    color: "#333",
   },
-  totalLabel: {
+  buttonRow: {
+    flexDirection: "row",
+    gap: 20,
+    marginBottom: 16,
+  },
+  button: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  start: {
+    backgroundColor: "#5cb85c",
+  },
+  stop: {
+    backgroundColor: "#d9534f",
+  },
+  reset: {
+    backgroundColor: "#f0ad4e",
+  },
+  mode: {
+    backgroundColor: "#007bff",
+  },
+  buttonText: {
+    color: "#fff",
     fontSize: 16,
-    marginTop: 30,
+    fontWeight: "bold",
+    textAlign: "center",
   },
-  total: {
-    fontSize: 28,
-    color: "#555",
+  progressWrapper: {
+    width: "100%",
+    marginTop: 12,
+    alignItems: "center",
+  },
+  progressLabel: {
+    fontSize: 14,
+    marginBottom: 4,
+    color: "#4b2e83",
+    fontWeight: "500",
+  },
+  progressBar: {
+    width: "100%",
+    height: 10,
+    backgroundColor: "#e0e0e0",
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: "#4caf50",
+    borderRadius: 10,
+  },
+  progressText: {
+    fontSize: 13,
+    marginTop: 2,
+    color: "#4b2e83",
+    fontWeight: "500",
   },
 });

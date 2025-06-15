@@ -1,0 +1,126 @@
+import React, { useEffect, useRef, useState } from "react";
+import {
+  View,
+  Image,
+  Animated,
+  StyleSheet,
+  Easing,
+} from "react-native";
+import { egyptEraAssets } from "@/config/egyptEraConfig";
+import { ANCIENT_START, SECONDS_PER_LEVEL } from "@/config/eraThresholdConfig";
+
+
+interface AncientMapProps {
+  totalFocusTime: number; // in seconds
+}
+
+const MAX_MAP_WIDTH = 320;
+const ASSET_SIZE = 155; 
+const HALF_SIZE = ASSET_SIZE / 2;
+
+export default function AncientMap({ totalFocusTime }: AncientMapProps) {
+  const [unlockedAssets, setUnlockedAssets] = useState<string[]>([]);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const opacityAnim = useRef(new Animated.Value(1)).current;
+
+  const relativeFocusTime = totalFocusTime - ANCIENT_START;
+  const eraLevel = Math.min(3, Math.floor(relativeFocusTime / SECONDS_PER_LEVEL) + 1);
+
+  useEffect(() => {
+    const newlyUnlocked = egyptEraAssets.filter(
+      (asset) =>
+        !unlockedAssets.includes(asset.name) &&
+        totalFocusTime >= SECONDS_PER_LEVEL // unlock once
+    );
+
+    if (newlyUnlocked.length > 0) {
+      const newNames = newlyUnlocked.map((a) => a.name);
+      setUnlockedAssets((prev) => [...prev, ...newNames]);
+
+      scaleAnim.setValue(0.3);
+      opacityAnim.setValue(0);
+
+      Animated.parallel([
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.out(Easing.exp),
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 800,
+          easing: Easing.out(Easing.exp),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [totalFocusTime]);
+
+  const tiles = [];
+
+  // Base image (single PNG)
+  tiles.push(
+    <Image
+      key="base"
+      source={require("@/assets/images/ancient-egypt-assets/desert-base.png")}
+      style={{
+        width: MAX_MAP_WIDTH,
+        height: (MAX_MAP_WIDTH * 3) / 4,
+        position: "absolute",
+        top: 0,
+        left: 0,
+        zIndex: 0,
+      }}
+    />
+  );
+
+  // Render assets by current level
+  egyptEraAssets.forEach((asset) => {
+    const isJustUnlocked = unlockedAssets.includes(asset.name);
+    tiles.push(
+      <Animated.Image
+      key={asset.name}
+      source={asset.images[eraLevel]}
+      style={{
+        position: "absolute",
+        top: asset.top,
+        left: asset.left,
+        width: ASSET_SIZE,
+        height: ASSET_SIZE,
+        zIndex: 100,
+        transform: [
+          { translateX: -HALF_SIZE }, // shift half width left
+          { translateY: -HALF_SIZE }, // shift half height up
+          { scale: isJustUnlocked ? scaleAnim : 1 },
+    ],
+  }}
+/>
+
+    );
+  });
+
+  return (
+    <View style={styles.mapWrapper}>
+      <View
+        style={{
+          position: "relative",
+          width: MAX_MAP_WIDTH,
+          height: (MAX_MAP_WIDTH * 3) / 4,
+        }}
+      >
+        {tiles}
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  mapWrapper: {
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 10,
+    paddingBottom: 0,
+  },
+});
