@@ -17,7 +17,7 @@ export const renaissanceEraAssets: EraAsset[] = [
       2: require("@/assets/images/renaissance-assets/cathedral-2.png"),
       3: require("@/assets/images/renaissance-assets/cathedral-3.png"),
     },
-    top: 90,
+    top: 80,
     left: 78,
   },
   {
@@ -27,8 +27,8 @@ export const renaissanceEraAssets: EraAsset[] = [
       2: require("@/assets/images/renaissance-assets/palazzo-2.png"),
       3: require("@/assets/images/renaissance-assets/palazzo-3.png"),
     },
-    top: 100,
-    left: 250,
+    top: 87,
+    left: 260,
   },
   {
     name: "alchemy",
@@ -37,8 +37,8 @@ export const renaissanceEraAssets: EraAsset[] = [
       2: require("@/assets/images/renaissance-assets/alchemy-2.png"),
       3: require("@/assets/images/renaissance-assets/alchemy-3.png"),
     },
-    top: 118,
-    left: 192,
+    top: 110,
+    left: 196,
   },
   {
     name: "library",
@@ -47,7 +47,7 @@ export const renaissanceEraAssets: EraAsset[] = [
       2: require("@/assets/images/renaissance-assets/library-2.png"),
       3: require("@/assets/images/renaissance-assets/library-3.png"),
     },
-    top: 60,
+    top: 55,
     left: 160,
   },
   {
@@ -77,8 +77,8 @@ export const renaissanceEraAssets: EraAsset[] = [
       2: require("@/assets/images/renaissance-assets/griffin.png"),
       3: require("@/assets/images/renaissance-assets/griffin.png"),
     },
-    top: 80,
-    left: 200,
+    top: 70,
+    left: 210,
   },
   {
     name: "owl",
@@ -87,7 +87,10 @@ export const renaissanceEraAssets: EraAsset[] = [
       2: require("@/assets/images/renaissance-assets/owl.png"),
       3: require("@/assets/images/renaissance-assets/owl.png"),
     },
-    top: 138,
+    top: 132,
     left: 150,
   },
 ];
+
+export const renaissanceBase = require("@/assets/images/renaissance-assets/renaissance-base.png");
+

@@ -1,40 +1,29 @@
 import React, { useEffect, useRef, useState } from "react";
-import {
-  View,
-  Image,
-  Animated,
-  StyleSheet,
-  Easing,
-} from "react-native";
-import { renaissanceEraAssets } from "@/config/renaissanceEraConfig";
-import { RENAISSANCE_START, SECONDS_PER_LEVEL } from "@/config/eraThresholdConfig";
+import { View, Image, Animated, StyleSheet, Easing } from "react-native";
+import { renaissanceEraAssets, renaissanceBase } from "@/config/renaissanceEraConfig";
+import { RENAISSANCE_START, SECONDS_PER_LEVEL, LEVELS_PER_ERA } from "@/config/eraThresholdConfig";
 
 interface RenaissanceMapProps {
   totalFocusTime: number;
 }
 
 const MAX_MAP_WIDTH = 320;
-const ASSET_SIZE = 180; 
+const ASSET_SIZE = 200;
 const HALF_SIZE = ASSET_SIZE / 2;
 
 export default function RenaissanceMap({ totalFocusTime }: RenaissanceMapProps) {
-  const [unlockedAssets, setUnlockedAssets] = useState<string[]>([]);
+  const [prevEraLevel, setPrevEraLevel] = useState(1);
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const opacityAnim = useRef(new Animated.Value(1)).current;
 
   const relativeFocusTime = totalFocusTime - RENAISSANCE_START;
-  const eraLevel = Math.min(3, Math.floor(relativeFocusTime / SECONDS_PER_LEVEL) + 1);
+  const cappedTime = Math.max(relativeFocusTime, 0);
+  const level = Math.floor(cappedTime / SECONDS_PER_LEVEL);
+  const eraLevel = Math.min(level + 1, LEVELS_PER_ERA);
 
   useEffect(() => {
-    const newlyUnlocked = renaissanceEraAssets.filter(
-      (asset) =>
-        !unlockedAssets.includes(asset.name) &&
-        totalFocusTime >= SECONDS_PER_LEVEL
-    );
-
-    if (newlyUnlocked.length > 0) {
-      const newNames = newlyUnlocked.map((a) => a.name);
-      setUnlockedAssets((prev) => [...prev, ...newNames]);
+    if (eraLevel > prevEraLevel) {
+      setPrevEraLevel(eraLevel);
 
       scaleAnim.setValue(0.3);
       opacityAnim.setValue(0);
@@ -54,15 +43,14 @@ export default function RenaissanceMap({ totalFocusTime }: RenaissanceMapProps) 
         }),
       ]).start();
     }
-  }, [totalFocusTime]);
+  }, [eraLevel]);
 
   const tiles = [];
 
-  // Add base tile
   tiles.push(
     <Image
       key="base"
-      source={require("@/assets/images/renaissance-assets/renaissance-base.png")}
+      source={renaissanceBase}
       style={{
         width: MAX_MAP_WIDTH,
         height: (MAX_MAP_WIDTH * 3) / 4,
@@ -74,10 +62,7 @@ export default function RenaissanceMap({ totalFocusTime }: RenaissanceMapProps) 
     />
   );
 
-  // Render assets
   renaissanceEraAssets.forEach((asset) => {
-    const isJustUnlocked = unlockedAssets.includes(asset.name);
-
     tiles.push(
       <Animated.Image
         key={asset.name}
@@ -92,9 +77,9 @@ export default function RenaissanceMap({ totalFocusTime }: RenaissanceMapProps) 
           transform: [
             { translateX: -HALF_SIZE },
             { translateY: -HALF_SIZE },
-            { scale: isJustUnlocked ? scaleAnim : 1 },
+            { scale: scaleAnim },
           ],
-          opacity: isJustUnlocked ? opacityAnim : 1,
+          opacity: opacityAnim,
         }}
       />
     );
