@@ -1,41 +1,29 @@
 import React, { useEffect, useRef, useState } from "react";
-import {
-  View,
-  Image,
-  Animated,
-  StyleSheet,
-  Easing,
-} from "react-native";
-import { egyptEraAssets } from "@/config/egyptEraConfig";
-import { ANCIENT_START, SECONDS_PER_LEVEL } from "@/config/eraThresholdConfig";
-
+import { View, Image, Animated, StyleSheet, Easing } from "react-native";
+import { egyptEraAssets, egyptBase } from "@/config/egyptEraConfig";
+import { ANCIENT_START, SECONDS_PER_LEVEL, LEVELS_PER_ERA } from "@/config/eraThresholdConfig";
 
 interface AncientMapProps {
-  totalFocusTime: number; // in seconds
+  totalFocusTime: number;
 }
 
 const MAX_MAP_WIDTH = 320;
-const ASSET_SIZE = 155; 
+const ASSET_SIZE = 155;
 const HALF_SIZE = ASSET_SIZE / 2;
 
 export default function AncientMap({ totalFocusTime }: AncientMapProps) {
-  const [unlockedAssets, setUnlockedAssets] = useState<string[]>([]);
+  const [prevEraLevel, setPrevEraLevel] = useState(1);
   const scaleAnim = useRef(new Animated.Value(1)).current;
   const opacityAnim = useRef(new Animated.Value(1)).current;
 
   const relativeFocusTime = totalFocusTime - ANCIENT_START;
-  const eraLevel = Math.min(3, Math.floor(relativeFocusTime / SECONDS_PER_LEVEL) + 1);
+  const cappedTime = Math.max(relativeFocusTime, 0);
+  const level = Math.floor(cappedTime / SECONDS_PER_LEVEL);
+  const eraLevel = Math.min(level + 1, LEVELS_PER_ERA);
 
   useEffect(() => {
-    const newlyUnlocked = egyptEraAssets.filter(
-      (asset) =>
-        !unlockedAssets.includes(asset.name) &&
-        totalFocusTime >= SECONDS_PER_LEVEL // unlock once
-    );
-
-    if (newlyUnlocked.length > 0) {
-      const newNames = newlyUnlocked.map((a) => a.name);
-      setUnlockedAssets((prev) => [...prev, ...newNames]);
+    if (eraLevel > prevEraLevel) {
+      setPrevEraLevel(eraLevel);
 
       scaleAnim.setValue(0.3);
       opacityAnim.setValue(0);
@@ -55,15 +43,14 @@ export default function AncientMap({ totalFocusTime }: AncientMapProps) {
         }),
       ]).start();
     }
-  }, [totalFocusTime]);
+  }, [eraLevel]);
 
   const tiles = [];
 
-  // Base image (single PNG)
   tiles.push(
     <Image
       key="base"
-      source={require("@/assets/images/ancient-egypt-assets/desert-base.png")}
+      source={egyptBase}
       style={{
         width: MAX_MAP_WIDTH,
         height: (MAX_MAP_WIDTH * 3) / 4,
@@ -75,28 +62,26 @@ export default function AncientMap({ totalFocusTime }: AncientMapProps) {
     />
   );
 
-  // Render assets by current level
   egyptEraAssets.forEach((asset) => {
-    const isJustUnlocked = unlockedAssets.includes(asset.name);
     tiles.push(
       <Animated.Image
-      key={asset.name}
-      source={asset.images[eraLevel]}
-      style={{
-        position: "absolute",
-        top: asset.top,
-        left: asset.left,
-        width: ASSET_SIZE,
-        height: ASSET_SIZE,
-        zIndex: 100,
-        transform: [
-          { translateX: -HALF_SIZE }, // shift half width left
-          { translateY: -HALF_SIZE }, // shift half height up
-          { scale: isJustUnlocked ? scaleAnim : 1 },
-    ],
-  }}
-/>
-
+        key={asset.name}
+        source={asset.images[eraLevel]}
+        style={{
+          position: "absolute",
+          top: asset.top,
+          left: asset.left,
+          width: ASSET_SIZE,
+          height: ASSET_SIZE,
+          zIndex: 100,
+          transform: [
+            { translateX: -HALF_SIZE },
+            { translateY: -HALF_SIZE },
+            { scale: scaleAnim },
+          ],
+          opacity: opacityAnim,
+        }}
+      />
     );
   });
 

@@ -14,7 +14,10 @@ import dayjs from "dayjs";
 import { useRouter } from "expo-router";
 import AncientMap from "@/components/AncientMap";
 import RenaissanceMap from "@/components/RenaissanceMap";
+import FutureMap from "@/components/FutureMap";
+import EraTransitionWrapper from "@/components/EraTransitionWrapper";
 import { getProgressToNextStage } from "@/utils/getProgressToNextStage";
+import { RENAISSANCE_START, FUTURE_START } from "@/config/eraThresholdConfig";
 
 const router = useRouter();
 
@@ -27,7 +30,7 @@ export default function HomeScreen() {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [prevElapsedTime, setPrevElapsedTime] = useState(0);
   const [totalFocusTime, setTotalFocusTime] = useState(0);
-  const [sessionTime, setSessionTime] = useState(0); // New live-tracking session timer
+  const [sessionTime, setSessionTime] = useState(0);
 
   const [pomodoroPhase, setPomodoroPhase] = useState<PomodoroPhase>("focus");
   const [prevRemainingTime, setPrevRemainingTime] = useState(25 * 60);
@@ -40,6 +43,26 @@ export default function HomeScreen() {
   const POMODORO_DURATION = 25 * 60;
   const BREAK_DURATION = 5 * 60;
   const userId = "demo-user";
+
+  const liveFocusTime = totalFocusTime + sessionTime;
+  const { current, max, label } = getProgressToNextStage(liveFocusTime);
+  const progressPercent = Math.min(current / max, 1);
+
+  const currentEra = liveFocusTime >= FUTURE_START
+    ? "future"
+    : liveFocusTime >= RENAISSANCE_START
+    ? "renaissance"
+    : "ancient";
+
+  let MapComponent;
+
+  if (liveFocusTime >= FUTURE_START) {
+    MapComponent = FutureMap;
+  } else if (liveFocusTime >= RENAISSANCE_START) {
+    MapComponent = RenaissanceMap;
+  } else {
+    MapComponent = AncientMap;
+  }
 
   const floatAnim = useRef(new Animated.Value(0)).current;
 
@@ -74,12 +97,11 @@ export default function HomeScreen() {
           setStreak(data.streak || 0);
           setLastStudyDate(data.lastStudyDate || "");
 
-          // Check if streak should be reset based on inactivity
           const today = dayjs().format("YYYY-MM-DD");
           const yesterday = dayjs().subtract(1, "day").format("YYYY-MM-DD");
 
           if (data.lastStudyDate && data.lastStudyDate !== today && data.lastStudyDate !== yesterday) {
-            setStreak(0); // Temporarily show 0 on load
+            setStreak(0);
           }
         }
         setHasLoadedFromFirestore(true);
@@ -223,14 +245,8 @@ export default function HomeScreen() {
     setMode((prev) => (prev === "stopwatch" ? "pomodoro" : "stopwatch"));
   };
 
-  const liveFocusTime = totalFocusTime + sessionTime;
-  const { current, max, label } = getProgressToNextStage(liveFocusTime);
-  const progressPercent = Math.min(current / max, 1);
-  const MapComponent = liveFocusTime >= 30 ? RenaissanceMap : AncientMap;
-
   return (
     <View style={styles.container}>
-      {/* Top Stats */}
       <View style={styles.statsBar}>
         <Text style={styles.statText}>🔥 Streak: {streak} day(s)</Text>
         <Text style={styles.statText}>
@@ -238,7 +254,6 @@ export default function HomeScreen() {
           {Math.floor((liveFocusTime % 3600) / 60)}m {liveFocusTime % 60}s
         </Text>
 
-        {/* ✅ Embedded Progress Bar */}
         <View style={styles.progressWrapper}>
           <Text style={styles.progressLabel}>{label}</Text>
           <View style={styles.progressBar}>
@@ -255,8 +270,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-
-      {/* Character Map */}
+      {/* Map with Transition */}
       <TouchableOpacity
         onPress={() =>
           router.push({
@@ -265,19 +279,37 @@ export default function HomeScreen() {
           })
         }
       >
-        <View style={{ marginTop: -50, marginBottom: 10, alignItems: "center" }}>
-          <MapComponent totalFocusTime={liveFocusTime} />
+        <View
+          style={{
+            marginTop: -50,
+            marginBottom: -10,
+            alignItems: "center",
+            height: (320 * 3) / 4,
+          }}
+        >
+          <EraTransitionWrapper currentEra={currentEra}>
+            <MapComponent totalFocusTime={liveFocusTime} />
+          </EraTransitionWrapper>
         </View>
       </TouchableOpacity>
 
-      {/* Timer */}
+      {/* Era Name */}
+      <View style={styles.eraNameWrapper}>
+        <Text style={styles.eraNameText}>
+          {currentEra === "ancient"
+            ? "🏺 Ancient Egypt"
+            : currentEra === "renaissance"
+            ? "🎭 Renaissance"
+            : "🛸 Future"}
+        </Text>
+      </View>
+
       <Text style={styles.timer}>
         {mode === "stopwatch"
           ? formatTime(elapsedTime)
           : formatTime(remainingTime)}
       </Text>
 
-      {/* Buttons */}
       <View style={styles.buttonRow}>
         <TouchableOpacity
           style={[styles.button, isRunning ? styles.stop : styles.start]}
@@ -335,9 +367,6 @@ const styles = StyleSheet.create({
     color: "#4b2e83",
     textAlign: "center",
     marginVertical: 4,
-    textShadowColor: "#fff",
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 1,
   },
   timer: {
     fontSize: 64,
@@ -402,5 +431,14 @@ const styles = StyleSheet.create({
     marginTop: 2,
     color: "#4b2e83",
     fontWeight: "500",
+  },
+  eraNameWrapper: {
+    marginTop: 15,
+    marginBottom: 8,
+  },
+  eraNameText: {
+    fontSize: 25,
+    fontWeight: "700",
+    color: "#333",
   },
 });
