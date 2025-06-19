@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   Animated,
   Easing,
-  DimensionValue
+  DimensionValue,
 } from "react-native";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/firebaseConfig";
@@ -15,6 +15,7 @@ import { useRouter } from "expo-router";
 import AncientMap from "@/components/AncientMap";
 import RenaissanceMap from "@/components/RenaissanceMap";
 import { getProgressToNextStage } from "@/utils/getProgressToNextStage";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const router = useRouter();
 
@@ -39,9 +40,33 @@ export default function HomeScreen() {
 
   const POMODORO_DURATION = 25 * 60;
   const BREAK_DURATION = 5 * 60;
-  const userId = "demo-user";
 
   const floatAnim = useRef(new Animated.Value(0)).current;
+  const [userId, setUserId] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null); // display username
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const id = await AsyncStorage.getItem("userId");
+      console.log(" Retrieved userId from storage:", id); // debug
+      if (!id) return;
+
+      setUserId(id);
+
+      try {
+        const userDoc = await getDoc(doc(db, "users", id));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          setUsername(data.username || "User");
+          console.log("Fetched username:", data.username); // ✅debug
+        }
+      } catch (err) {
+        console.error("Failed to fetch username:", err);
+      }
+    };
+
+    fetchUserData();
+  }, []);
 
   useEffect(() => {
     Animated.loop(
@@ -63,6 +88,8 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
+    if (!userId) return;
+
     const fetchFocusTime = async () => {
       try {
         const userRef = doc(db, "users", userId);
@@ -74,14 +101,18 @@ export default function HomeScreen() {
           setStreak(data.streak || 0);
           setLastStudyDate(data.lastStudyDate || "");
 
-          // Check if streak should be reset based on inactivity
           const today = dayjs().format("YYYY-MM-DD");
           const yesterday = dayjs().subtract(1, "day").format("YYYY-MM-DD");
 
-          if (data.lastStudyDate && data.lastStudyDate !== today && data.lastStudyDate !== yesterday) {
-            setStreak(0); // Temporarily show 0 on load
+          if (
+            data.lastStudyDate &&
+            data.lastStudyDate !== today &&
+            data.lastStudyDate !== yesterday
+          ) {
+            setStreak(0); // Reset only visually until updated
           }
         }
+
         setHasLoadedFromFirestore(true);
       } catch (error) {
         console.error("Error fetching focus time:", error);
@@ -89,13 +120,15 @@ export default function HomeScreen() {
     };
 
     fetchFocusTime();
-  }, []);
+  }, [userId]); // ✅ re-run whenever userId is set
 
   useEffect(() => {
     if (!hasLoadedFromFirestore) return;
     const saveFocusTime = async () => {
       try {
+        if (!userId) return;
         const userRef = doc(db, "users", userId);
+
         await setDoc(
           userRef,
           {
@@ -232,6 +265,18 @@ export default function HomeScreen() {
     <View style={styles.container}>
       {/* Top Stats */}
       <View style={styles.statsBar}>
+        {username && (
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: "600",
+              marginBottom: 8,
+              color: "#4b2e83",
+            }}
+          >
+            Hi, {username}!
+          </Text>
+        )}
         <Text style={styles.statText}>🔥 Streak: {streak} day(s)</Text>
         <Text style={styles.statText}>
           ⏳ Total: {Math.floor(liveFocusTime / 3600)}h{" "}
@@ -245,7 +290,11 @@ export default function HomeScreen() {
             <View
               style={[
                 styles.progressFill,
-                { width: `${(progressPercent * 100).toFixed(1)}%` as DimensionValue },
+                {
+                  width: `${(progressPercent * 100).toFixed(
+                    1
+                  )}%` as DimensionValue,
+                },
               ]}
             />
           </View>
@@ -254,7 +303,6 @@ export default function HomeScreen() {
           </Text>
         </View>
       </View>
-
 
       {/* Character Map */}
       <TouchableOpacity
@@ -265,7 +313,9 @@ export default function HomeScreen() {
           })
         }
       >
-        <View style={{ marginTop: -50, marginBottom: 10, alignItems: "center" }}>
+        <View
+          style={{ marginTop: -50, marginBottom: 10, alignItems: "center" }}
+        >
           <MapComponent totalFocusTime={liveFocusTime} />
         </View>
       </TouchableOpacity>
