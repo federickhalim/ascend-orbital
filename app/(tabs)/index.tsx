@@ -14,7 +14,10 @@ import dayjs from "dayjs";
 import { useRouter } from "expo-router";
 import AncientMap from "@/components/AncientMap";
 import RenaissanceMap from "@/components/RenaissanceMap";
+import FutureMap from "@/components/FutureMap";
+import EraTransitionWrapper from "@/components/EraTransitionWrapper";
 import { getProgressToNextStage } from "@/utils/getProgressToNextStage";
+import { RENAISSANCE_START, FUTURE_START } from "@/config/eraThresholdConfig";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const router = useRouter();
@@ -28,7 +31,7 @@ export default function HomeScreen() {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [prevElapsedTime, setPrevElapsedTime] = useState(0);
   const [totalFocusTime, setTotalFocusTime] = useState(0);
-  const [sessionTime, setSessionTime] = useState(0); // New live-tracking session timer
+  const [sessionTime, setSessionTime] = useState(0);
 
   const [pomodoroPhase, setPomodoroPhase] = useState<PomodoroPhase>("focus");
   const [prevRemainingTime, setPrevRemainingTime] = useState(25 * 60);
@@ -58,7 +61,7 @@ export default function HomeScreen() {
         if (userDoc.exists()) {
           const data = userDoc.data();
           setUsername(data.username || "User");
-          console.log("Fetched username:", data.username); // ✅debug
+          console.log("Fetched username:", data.username); // debug
         }
       } catch (err) {
         console.error("Failed to fetch username:", err);
@@ -67,6 +70,26 @@ export default function HomeScreen() {
 
     fetchUserData();
   }, []);
+
+  const liveFocusTime = totalFocusTime + sessionTime;
+  const { current, max, label } = getProgressToNextStage(liveFocusTime);
+  const progressPercent = Math.min(current / max, 1);
+
+  const currentEra =
+    liveFocusTime >= FUTURE_START
+      ? "future"
+      : liveFocusTime >= RENAISSANCE_START
+      ? "renaissance"
+      : "ancient";
+
+  let MapComponent;
+  if (liveFocusTime >= FUTURE_START) {
+    MapComponent = FutureMap;
+  } else if (liveFocusTime >= RENAISSANCE_START) {
+    MapComponent = RenaissanceMap;
+  } else {
+    MapComponent = AncientMap;
+  }
 
   useEffect(() => {
     Animated.loop(
@@ -109,7 +132,7 @@ export default function HomeScreen() {
             data.lastStudyDate !== today &&
             data.lastStudyDate !== yesterday
           ) {
-            setStreak(0); // Reset only visually until updated
+            setStreak(0);
           }
         }
 
@@ -120,7 +143,7 @@ export default function HomeScreen() {
     };
 
     fetchFocusTime();
-  }, [userId]); // ✅ re-run whenever userId is set
+  }, [userId]);
 
   useEffect(() => {
     if (!hasLoadedFromFirestore) return;
@@ -256,11 +279,6 @@ export default function HomeScreen() {
     setMode((prev) => (prev === "stopwatch" ? "pomodoro" : "stopwatch"));
   };
 
-  const liveFocusTime = totalFocusTime + sessionTime;
-  const { current, max, label } = getProgressToNextStage(liveFocusTime);
-  const progressPercent = Math.min(current / max, 1);
-  const MapComponent = liveFocusTime >= 30 ? RenaissanceMap : AncientMap;
-
   return (
     <View style={styles.container}>
       {/* Top Stats */}
@@ -316,18 +334,38 @@ export default function HomeScreen() {
         <View
           style={{ marginTop: -50, marginBottom: 10, alignItems: "center" }}
         >
-          <MapComponent totalFocusTime={liveFocusTime} />
+          <View
+            style={{
+              marginTop: -50,
+              marginBottom: -10,
+              alignItems: "center",
+              height: (320 * 3) / 4,
+            }}
+          >
+            <EraTransitionWrapper currentEra={currentEra}>
+              <MapComponent totalFocusTime={liveFocusTime} />
+            </EraTransitionWrapper>
+          </View>
         </View>
       </TouchableOpacity>
 
-      {/* Timer */}
+      {/* Era Name */}
+      <View style={styles.eraNameWrapper}>
+        <Text style={styles.eraNameText}>
+          {currentEra === "ancient"
+            ? "🏺 Ancient Egypt"
+            : currentEra === "renaissance"
+            ? "🎭 Renaissance"
+            : "🛸 Future"}
+        </Text>
+      </View>
+
       <Text style={styles.timer}>
         {mode === "stopwatch"
           ? formatTime(elapsedTime)
           : formatTime(remainingTime)}
       </Text>
 
-      {/* Buttons */}
       <View style={styles.buttonRow}>
         <TouchableOpacity
           style={[styles.button, isRunning ? styles.stop : styles.start]}
@@ -385,9 +423,6 @@ const styles = StyleSheet.create({
     color: "#4b2e83",
     textAlign: "center",
     marginVertical: 4,
-    textShadowColor: "#fff",
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 1,
   },
   timer: {
     fontSize: 64,
@@ -452,5 +487,14 @@ const styles = StyleSheet.create({
     marginTop: 2,
     color: "#4b2e83",
     fontWeight: "500",
+  },
+  eraNameWrapper: {
+    marginTop: 15,
+    marginBottom: 8,
+  },
+  eraNameText: {
+    fontSize: 25,
+    fontWeight: "700",
+    color: "#333",
   },
 });
