@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
 import { db } from "@/firebaseConfig";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   doc,
   getDoc,
@@ -33,8 +34,6 @@ interface User {
   friends?: string[];
 }
 
-const CURRENT_USER_ID = "demo-user";
-
 export default function FriendsPage() {
   const [friends, setFriends] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -42,15 +41,27 @@ export default function FriendsPage() {
   const [newUsername, setNewUsername] = useState("");
   const [isAdding, setIsAdding] = useState(false);
   const [expandedFriendId, setExpandedFriendId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchFriendsData();
+    const getUserIdAndFetch = async () => {
+      const storedId = await AsyncStorage.getItem("userId");
+      if (storedId) {
+        setCurrentUserId(storedId);
+        fetchFriendsData(storedId);
+      } else {
+        console.warn("No userId found in AsyncStorage");
+        setLoading(false);
+      }
+    };
+
+    getUserIdAndFetch();
   }, []);
 
-  const fetchFriendsData = async () => {
+  const fetchFriendsData = async (userId: string) => {
     setLoading(true);
     try {
-      const userRef = doc(db, "users", CURRENT_USER_ID);
+      const userRef = doc(db, "users", userId);
       const snapshot = await getDoc(userRef);
 
       if (!snapshot.exists()) throw new Error("User not found");
@@ -59,7 +70,7 @@ export default function FriendsPage() {
       const friendIds: string[] = userData.friends || [];
 
       const tempUser: User = {
-        uid: CURRENT_USER_ID,
+        uid: userId,
         username: userData.username || "You",
         totalFocusTime: userData.totalFocusTime || 0,
         streak: userData.streak || 0,
@@ -91,7 +102,7 @@ export default function FriendsPage() {
   };
 
   const addFriendByUsername = async () => {
-    if (!newUsername.trim()) return;
+    if (!newUsername.trim() || !currentUserId) return;
     setIsAdding(true);
 
     try {
@@ -102,24 +113,30 @@ export default function FriendsPage() {
       const snapshot = await getDocs(q);
 
       if (snapshot.empty) {
-        Alert.alert("User not found", `No user with username "${newUsername}".`);
+        Alert.alert(
+          "User not found",
+          `No user with username "${newUsername}".`
+        );
         return;
       }
 
       const friendDoc = snapshot.docs[0];
       const friendId = friendDoc.id;
 
-      if (friendId === CURRENT_USER_ID) {
+      if (friendId === currentUserId) {
         Alert.alert("Invalid", "You cannot add yourself as a friend.");
         return;
       }
 
       if (currentUser?.uid) {
-        const currentRef = doc(db, "users", CURRENT_USER_ID);
+        const currentRef = doc(db, "users", currentUserId);
         const alreadyFriends = currentUser.friends?.includes(friendId);
 
         if (alreadyFriends) {
-          Alert.alert("Already Friends", `${newUsername} is already in your list.`);
+          Alert.alert(
+            "Already Friends",
+            `${newUsername} is already in your list.`
+          );
           return;
         }
 
@@ -129,7 +146,7 @@ export default function FriendsPage() {
 
         Alert.alert("Success", `${newUsername} has been added.`);
         setNewUsername("");
-        fetchFriendsData();
+        fetchFriendsData(currentUserId);
       }
     } catch (err) {
       console.error("Error adding friend:", err);
@@ -156,11 +173,12 @@ export default function FriendsPage() {
 
   const removeFriend = async (friendId: string) => {
     try {
-      await updateDoc(doc(db, "users", CURRENT_USER_ID), {
+      if (!currentUserId) return;
+      await updateDoc(doc(db, "users", currentUserId), {
         friends: arrayRemove(friendId),
       });
       setExpandedFriendId(null);
-      fetchFriendsData();
+      fetchFriendsData(currentUserId);
     } catch (err) {
       console.error("Error removing friend:", err);
       Alert.alert("Error", "Unable to remove friend.");
@@ -181,7 +199,7 @@ export default function FriendsPage() {
   );
 
   const renderItem = ({ item, index }: { item: User; index: number }) => {
-    const isMe = item.uid === CURRENT_USER_ID;
+    const isMe = item.uid === currentUserId;
     const isExpanded = expandedFriendId === item.uid;
 
     const cardContent = (
@@ -202,13 +220,22 @@ export default function FriendsPage() {
           <View style={{ flex: 1 }}>
             <Text style={styles.name}>{isMe ? "You" : item.username}</Text>
             <Text style={styles.meta}>
-              Focus Time: {Math.floor(item.totalFocusTime / 60)} mins • Streak: {item.streak}
+              Focus Time: {Math.floor(item.totalFocusTime / 60)} mins • Streak:{" "}
+              {item.streak}
             </Text>
           </View>
         </View>
         {isExpanded && (
           <View style={styles.actionRow}>
-            <Button title="Visit Era" onPress={() => Alert.alert("Coming Soon", "Era feature is not yet implemented.")} />
+            <Button
+              title="Visit Era"
+              onPress={() =>
+                Alert.alert(
+                  "Coming Soon",
+                  "Era feature is not yet implemented."
+                )
+              }
+            />
             <Button
               title="Remove Friend"
               color="#d9534f"
@@ -222,7 +249,9 @@ export default function FriendsPage() {
     return isMe ? (
       cardContent
     ) : (
-      <Swipeable renderRightActions={() => renderRightActions(item.uid, item.username)}>
+      <Swipeable
+        renderRightActions={() => renderRightActions(item.uid, item.username)}
+      >
         {cardContent}
       </Swipeable>
     );

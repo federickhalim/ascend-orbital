@@ -91,3 +91,5 @@ export const egyptEraAssets: EraAsset[] = [
     left: 150,
   },
 ];
+
+export const egyptBase = require("@/assets/images/ancient-egypt-assets/desert-base.png");
