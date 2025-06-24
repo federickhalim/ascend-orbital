@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     marginTop: -40,
-    marginBottom: 50,
+    marginBottom: 60,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -416,6 +416,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 5,
+    zIndex: 10,
   },
   statText: {
     fontSize: 18,
