@@ -17,6 +17,15 @@ import DropDownPicker from "react-native-dropdown-picker";
 // @ts-ignore
 import Icon from "react-native-vector-icons/Feather";
 import { Swipeable } from "react-native-gesture-handler";
+import { db } from "@/firebaseConfig";
+import {
+  collection,
+  getDocs,
+  addDoc,
+  deleteDoc,
+  doc,
+  updateDoc,
+} from "firebase/firestore";
 
 interface Task {
   id: string;
@@ -42,59 +51,96 @@ export default function PlannerPage() {
     loadTasks();
   }, []);
 
-  useEffect(() => {
-    saveTasks();
-  }, [tasks]);
-
   const loadTasks = async () => {
-    const saved = await AsyncStorage.getItem("plannerTasks");
-    if (saved) setTasks(JSON.parse(saved));
+    const userId = await AsyncStorage.getItem("userId");
+    if (!userId) return;
+
+    try {
+      const snapshot = await getDocs(
+        collection(db, "users", userId, "planner")
+      );
+      const userTasks = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      })) as Task[];
+      setTasks(userTasks);
+    } catch (err) {
+      console.error("Error loading tasks:", err);
+    }
   };
 
   const saveTasks = async () => {
     await AsyncStorage.setItem("plannerTasks", JSON.stringify(tasks));
   };
 
-  const addTask = () => {
+  const addTask = async () => {
     if (!text.trim()) return;
-    const newTask: Task = {
-      id: Date.now().toString(),
+
+    const userId = await AsyncStorage.getItem("userId");
+    if (!userId) return;
+
+    const newTask = {
       text: text.trim(),
       dueDate: dueDate.toISOString().split("T")[0],
       priority,
       done: false,
     };
-    setTasks([...tasks, newTask]);
-    setText("");
-    setDueDate(new Date());
-    setPriority("Low");
-    setShowAddTask(false);
-    Keyboard.dismiss();
+
+    try {
+      const docRef = await addDoc(
+        collection(db, "users", userId, "planner"),
+        newTask
+      );
+      setTasks([...tasks, { ...newTask, id: docRef.id }]);
+      setText("");
+      setDueDate(new Date());
+      setPriority("Low");
+      setShowAddTask(false);
+      Keyboard.dismiss();
+    } catch (err) {
+      console.error("Error adding task:", err);
+    }
   };
 
-  const deleteTask = (id: string) => {
-    Alert.alert(
-      "Delete Task",
-      "Are you sure you want to delete this task?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => {
+  const deleteTask = async (id: string) => {
+    Alert.alert("Delete Task", "Are you sure you want to delete this task?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          const userId = await AsyncStorage.getItem("userId");
+          if (!userId) return;
+
+          try {
+            await deleteDoc(doc(db, "users", userId, "planner", id));
             setTasks(tasks.filter((t) => t.id !== id));
-          },
+          } catch (err) {
+            console.error("Error deleting task:", err);
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
-  const toggleDone = (id: string) => {
-    setTasks(
-      tasks.map((t) =>
-        t.id === id ? { ...t, done: !t.done } : t
-      )
-    );
+  const toggleDone = async (id: string) => {
+    const userId = await AsyncStorage.getItem("userId");
+    if (!userId) return;
+
+    const taskToUpdate = tasks.find((t) => t.id === id);
+    if (!taskToUpdate) return;
+
+    const updatedTask = { ...taskToUpdate, done: !taskToUpdate.done };
+
+    try {
+      await updateDoc(doc(db, "users", userId, "planner", id), {
+        done: updatedTask.done,
+      });
+
+      setTasks(tasks.map((t) => (t.id === id ? updatedTask : t)));
+    } catch (err) {
+      console.error("Error updating task:", err);
+    }
   };
 
   const getSortedTasks = () => {
@@ -175,9 +221,7 @@ export default function PlannerPage() {
         }
         renderItem={({ item }) => (
           <View style={{ marginBottom: 12 }}>
-            <Swipeable
-              renderRightActions={() => renderRightActions(item.id)}
-            >
+            <Swipeable renderRightActions={() => renderRightActions(item.id)}>
               <View
                 style={[
                   styles.taskCard,
@@ -191,22 +235,25 @@ export default function PlannerPage() {
                     item.done && styles.circleButtonDone,
                   ]}
                 >
-                  {item.done && (
-                    <Icon name="check" size={16} color="white" />
-                  )}
+                  {item.done && <Icon name="check" size={16} color="white" />}
                 </TouchableOpacity>
 
                 <View style={{ flex: 1 }}>
                   <Text
                     style={[
                       styles.taskTitle,
-                      item.done && { textDecorationLine: "line-through", color: "#aaa" },
+                      item.done && {
+                        textDecorationLine: "line-through",
+                        color: "#aaa",
+                      },
                     ]}
                   >
                     {item.text}
                   </Text>
                   <Text style={styles.taskMeta}>📅 Due: {item.dueDate}</Text>
-                  <Text style={styles.taskMeta}>🎯 Priority: {item.priority}</Text>
+                  <Text style={styles.taskMeta}>
+                    🎯 Priority: {item.priority}
+                  </Text>
                 </View>
 
                 {/* Bin button */}
