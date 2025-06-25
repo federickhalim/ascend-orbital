@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { useColorScheme } from '@/components/useColorScheme';
+import { preloadAssets } from '@/utils/preloadAssets';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -28,14 +29,23 @@ export default function RootLayout() {
     ...FontAwesome.font,
   });
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
     if (error) throw error;
   }, [error]);
 
   useEffect(() => {
+    const loadResources = async () => {
+      try {
+        await preloadAssets(); // preload all images
+      } catch (e) {
+        console.error('Error preloading assets', e);
+      } finally {
+        SplashScreen.hideAsync(); // only hide splash after preloading is done
+      }
+    };
+
     if (loaded) {
-      SplashScreen.hideAsync();
+      loadResources();
     }
   }, [loaded]);
 
