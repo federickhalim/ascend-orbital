@@ -47,6 +47,20 @@ export default function HomeScreen() {
   const floatAnim = useRef(new Animated.Value(0)).current;
   const [userId, setUserId] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null); // display username
+  const [checkingAuth, setCheckingAuth] = useState(true); // New state for splash delay
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const id = await AsyncStorage.getItem("userId");
+      if (!id) {
+        router.replace("/(auth)/login");
+      } else {
+        setUserId(id);
+      }
+      setCheckingAuth(false);
+    };
+    checkAuth();
+  }, []);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -278,6 +292,9 @@ export default function HomeScreen() {
     setPrevElapsedTime(0);
     setMode((prev) => (prev === "stopwatch" ? "pomodoro" : "stopwatch"));
   };
+  if (checkingAuth) {
+    return null;
+  }
 
   return (
     <View style={styles.container}>

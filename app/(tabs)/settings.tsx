@@ -93,6 +93,20 @@ export default function SettingsScreen() {
       >
         <Text style={styles.logoutText}>Delete Account</Text>
       </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[
+          styles.clearData,
+          { backgroundColor: "#991b1b", marginTop: 20 },
+        ]}
+        onPress={async () => {
+          await AsyncStorage.removeItem("userId");
+          await AsyncStorage.removeItem("userToken");
+          Alert.alert("Storage cleared");
+        }}
+      >
+        <Text style={styles.logoutText}>Clear Login Data</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -120,5 +134,11 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
+  },
+  clearData: {
+    backgroundColor: "#ef4444",
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 8,
   },
 });
