@@ -44,16 +44,12 @@ export default function RootLayout() {
   useEffect(() => {
     const loadResourcesAndCheckAuth = async () => {
       try {
-        console.log("🔄 Preloading assets...");
         await preloadAssets();
-        console.log("✅ Assets preloaded");
 
         const idToken = await AsyncStorage.getItem("userToken");
         const userId = await AsyncStorage.getItem("userId");
-        console.log("📦 Retrieved from storage:", { idToken, userId });
 
         if (!idToken || !userId) {
-          console.log("🚫 Missing token or userId. Redirecting to login...");
           await AsyncStorage.multiRemove(["userId", "userToken"]);
           setTimeout(() => {
             router.replace("/(auth)/login");
@@ -62,7 +58,6 @@ export default function RootLayout() {
           return;
         }
 
-        console.log("🔐 Verifying token with Firebase...");
         const res = await fetch(
           `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`,
           {
@@ -80,39 +75,34 @@ export default function RootLayout() {
             data.error?.message
           );
           await AsyncStorage.multiRemove(["userId", "userToken"]);
-          console.log("🔁 Redirecting to login...");
+
           setTimeout(() => {
             router.replace("/(auth)/login");
           }, 0);
 
           return;
         }
-
-        console.log("✅ Token is valid. Continuing to tabs.");
       } catch (e) {
         console.error("🔥 Auth check failed:", e);
         await AsyncStorage.multiRemove(["userId", "userToken"]);
-        console.log("🔁 Redirecting to login (from catch block)...");
+
         setTimeout(() => {
           router.replace("/(auth)/login");
         }, 0);
       } finally {
         setCheckingAuth(false);
-        console.log("🟢 Finished auth check. Hiding splash.");
+
         SplashScreen.hideAsync();
       }
     };
 
     if (loaded) {
-      console.log("🎉 Fonts loaded. Starting init.");
       loadResourcesAndCheckAuth();
     } else {
-      console.log("⏳ Waiting for fonts...");
     }
   }, [loaded]);
 
   if (!loaded || checkingAuth) {
-    console.log("⏳ App is still initializing...");
     return null; // or return <Text>Loading...</Text>
   }
 
