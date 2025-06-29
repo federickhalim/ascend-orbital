@@ -54,6 +54,7 @@ export default function SettingsScreen() {
 
               if (!authRes.ok) {
                 const error = await authRes.json();
+                console.error("Firebase delete error:", error);
                 throw new Error(
                   error.error.message || "Failed to delete Auth account"
                 );
@@ -62,8 +63,8 @@ export default function SettingsScreen() {
               // Delete Firestore user document
               await deleteDoc(doc(db, "users", userId));
 
-              // Clear local storage & redirect
-              await AsyncStorage.clear();
+              await AsyncStorage.multiRemove(["userId", "userToken"]);
+
               router.replace("/login");
             } catch (err: any) {
               Alert.alert(
