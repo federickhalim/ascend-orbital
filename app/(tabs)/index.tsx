@@ -19,6 +19,7 @@ import EraTransitionWrapper from "@/components/EraTransitionWrapper";
 import { getProgressToNextStage } from "@/utils/getProgressToNextStage";
 import { RENAISSANCE_START, FUTURE_START } from "@/config/eraThresholdConfig";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { formatDuration } from "@/utils/formatDuration"; 
 
 const router = useRouter();
 
@@ -314,8 +315,7 @@ export default function HomeScreen() {
         )}
         <Text style={styles.statText}>🔥 Streak: {streak} day(s)</Text>
         <Text style={styles.statText}>
-          ⏳ Total: {Math.floor(liveFocusTime / 3600)}h{" "}
-          {Math.floor((liveFocusTime % 3600) / 60)}m {liveFocusTime % 60}s
+          ⏳ Total: {formatDuration(liveFocusTime)}
         </Text>
 
         {/* ✅ Embedded Progress Bar */}
@@ -334,7 +334,7 @@ export default function HomeScreen() {
             />
           </View>
           <Text style={styles.progressText}>
-            {Math.floor(current)}s / {max}s
+            {formatDuration(current)} / {formatDuration(max, true)}
           </Text>
         </View>
       </View>
