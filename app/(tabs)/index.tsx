@@ -19,7 +19,9 @@ import EraTransitionWrapper from "@/components/EraTransitionWrapper";
 import { getProgressToNextStage } from "@/utils/getProgressToNextStage";
 import { RENAISSANCE_START, FUTURE_START } from "@/config/eraThresholdConfig";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { formatDuration } from "@/utils/formatDuration"; 
+import { formatDuration } from "@/utils/formatDuration";
+import { Audio } from "expo-av";
+import SessionCompleteModal from "@/components/SessionCompleteModal";
 
 const router = useRouter();
 
@@ -35,6 +37,30 @@ export default function HomeScreen() {
   const [sessionTime, setSessionTime] = useState(0);
 
   const [pomodoroPhase, setPomodoroPhase] = useState<PomodoroPhase>("focus");
+  const [showSessionComplete, setShowSessionComplete] = useState(false);
+
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+
+  const playAlarm = async () => {
+    try {
+      const { sound } = await Audio.Sound.createAsync(
+        require("@/assets/ringtone/timer.mp3")
+      );
+      setSound(sound);
+      await sound.playAsync();
+    } catch (error) {
+      console.error("Failed to play sound:", error);
+    }
+  };
+
+  useEffect(() => {
+    return sound
+      ? () => {
+          sound.unloadAsync();
+        }
+      : undefined;
+  }, [sound]);
+
   const [prevRemainingTime, setPrevRemainingTime] = useState(25 * 60);
   const [remainingTime, setRemainingTime] = useState(25 * 60);
 
@@ -205,6 +231,9 @@ export default function HomeScreen() {
       pomodoroPhase === "focus" ? POMODORO_DURATION : BREAK_DURATION;
 
     if (remainingTime === 0) {
+      playAlarm();
+      setShowSessionComplete(true);
+
       if (pomodoroPhase === "focus") {
         setTotalFocusTime((prev) => prev + duration);
         updateStreak();
@@ -214,6 +243,7 @@ export default function HomeScreen() {
         setPomodoroPhase("focus");
         setRemainingTime(POMODORO_DURATION);
       }
+
       setSessionTime(0);
       setIsRunning(false);
     }
@@ -338,7 +368,6 @@ export default function HomeScreen() {
           </Text>
         </View>
       </View>
-
       {/* Character Map */}
       <TouchableOpacity
         onPress={() =>
@@ -365,7 +394,6 @@ export default function HomeScreen() {
           </View>
         </View>
       </TouchableOpacity>
-
       {/* Era Name */}
       <View style={styles.eraNameWrapper}>
         <Text style={styles.eraNameText}>
@@ -382,7 +410,6 @@ export default function HomeScreen() {
           ? formatTime(elapsedTime)
           : formatTime(remainingTime)}
       </Text>
-
       <View style={styles.buttonRow}>
         <TouchableOpacity
           style={[styles.button, isRunning ? styles.stop : styles.start]}
@@ -398,7 +425,6 @@ export default function HomeScreen() {
           <Text style={styles.buttonText}>Reset</Text>
         </TouchableOpacity>
       </View>
-
       <TouchableOpacity
         style={[styles.button, styles.mode]}
         onPress={toggleMode}
@@ -407,6 +433,18 @@ export default function HomeScreen() {
           Switch to {mode === "stopwatch" ? "Pomodoro" : "Stopwatch"}
         </Text>
       </TouchableOpacity>
+      {showSessionComplete && (
+        <SessionCompleteModal
+          onClose={() => {
+            sound?.stopAsync();
+            setShowSessionComplete(false);
+            setPomodoroPhase("break");
+            setRemainingTime(BREAK_DURATION);
+            setIsRunning(false);
+            setSessionTime(0);
+          }}
+        />
+      )}
     </View>
   );
 }

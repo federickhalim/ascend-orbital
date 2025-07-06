@@ -70,10 +70,9 @@ export default function RootLayout() {
         const data = await res.json();
 
         if (!res.ok) {
-          console.error(
-            "❌ Invalid token. Firebase says:",
-            data.error?.message
-          );
+          if (data.error?.message !== "INVALID_ID_TOKEN") {
+            console.error(" Firebase auth check failed:", data.error?.message);
+          }
           await AsyncStorage.multiRemove(["userId", "userToken"]);
 
           setTimeout(() => {

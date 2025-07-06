@@ -1,24 +1,29 @@
 import { ScrollView } from "react-native";
 import { useRef, useEffect } from "react";
 import EraCard from "./EraCard";
+import {
+  ANCIENT_START,
+  RENAISSANCE_START,
+  FUTURE_START,
+} from "@/config/eraThresholdConfig";
 
 const eras = [
   {
     key: "ancient",
     name: "Ancient Egypt",
-    unlockHour: 0,
-    image: require("../assets/images/egypt.jpeg"),
+    unlockTime: ANCIENT_START,
+    image: require("../assets/images/egypt.png"),
   },
   {
     key: "renaissance",
     name: "Renaissance",
-    unlockHour: 300,
-    image: require("../assets/images/renaissance.jpg"),
+    unlockTime: RENAISSANCE_START,
+    image: require("../assets/images/renaissance.png"),
   },
   {
     key: "future",
     name: "Futuristic Era",
-    unlockHour: 800,
+    unlockTime: FUTURE_START,
     image: require("../assets/images/future.png"),
   },
 ];
@@ -28,20 +33,22 @@ export default function EraScroll({
 }: {
   totalFocusTimeInSeconds: number;
 }) {
-  const totalHours = totalFocusTimeInSeconds / 3600;
   const scrollRef = useRef<ScrollView>(null);
 
-  const currentIndex = eras.findIndex((era) => totalHours < era.unlockHour) - 1;
-  const unlockedIndex = currentIndex >= 0 ? currentIndex : eras.length - 1;
+  // Determine which era the user is currently in
+  const currentEraIndex = eras.findIndex((era, i) => {
+    const next = eras[i + 1];
+    return next ? totalFocusTimeInSeconds < next.unlockTime : true; // Last era fallback
+  });
 
   useEffect(() => {
     setTimeout(() => {
       scrollRef.current?.scrollTo({
-        y: unlockedIndex * 240, // estimated height per card
+        y: currentEraIndex * 240, // Adjust if card height changes
         animated: true,
       });
     }, 300);
-  }, []);
+  }, [currentEraIndex]);
 
   return (
     <ScrollView
@@ -50,8 +57,8 @@ export default function EraScroll({
       contentContainerStyle={{ alignItems: "center", paddingBottom: 40 }}
     >
       {eras.map((era, index) => {
-        const unlocked = totalHours >= era.unlockHour;
-        const isCurrent = index === unlockedIndex;
+        const unlocked = totalFocusTimeInSeconds >= era.unlockTime;
+        const isCurrent = index === currentEraIndex;
         return (
           <EraCard
             key={era.key}
