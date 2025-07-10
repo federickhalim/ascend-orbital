@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, Alert } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/firebaseConfig";
 
 import AncientMap from "@/components/AncientMap";
@@ -11,42 +11,45 @@ import EraTransitionWrapper from "@/components/EraTransitionWrapper";
 import { RENAISSANCE_START, FUTURE_START } from "@/config/eraThresholdConfig";
 import { formatDuration } from "@/utils/formatDuration";
 
+interface User {
+  username?: string;
+  totalFocusTime?: number;
+  streak?: number;
+}
+
 export default function VisitEraScreen() {
   const { friendId } = useLocalSearchParams<{ friendId: string }>();
-  const [friendData, setFriendData] = useState<any>(null);
+  const [friendData, setFriendData] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   const router = useRouter();
 
   useEffect(() => {
-    const fetchFriend = async () => {
-      if (!friendId) {
-        Alert.alert("Error", "No friend ID provided.");
-        router.back();
-        return;
-      }
+    if (!friendId) {
+      Alert.alert("Error", "No friend ID provided.");
+      router.back();
+      return;
+    }
 
-      try {
-        const docRef = doc(db, "users", friendId);
-        const snapshot = await getDoc(docRef);
-
+    const unsub = onSnapshot(
+      doc(db, "users", friendId),
+      (snapshot) => {
         if (!snapshot.exists()) {
           Alert.alert("Error", "Friend data not found.");
           router.back();
           return;
         }
-
-        setFriendData(snapshot.data());
-      } catch (err) {
-        console.error("Error fetching friend data:", err);
+        setFriendData(snapshot.data() as User);
+        setLoading(false);
+      },
+      (error) => {
+        console.error("Error fetching friend data:", error);
         Alert.alert("Error", "Something went wrong.");
         router.back();
-      } finally {
-        setLoading(false);
       }
-    };
+    );
 
-    fetchFriend();
+    return () => unsub();
   }, [friendId]);
 
   if (loading) {
@@ -67,7 +70,6 @@ export default function VisitEraScreen() {
 
   const liveFocusTime = friendData.totalFocusTime || 0;
 
-  // ✅ Correct union type — no type error!
   let currentEra: "ancient" | "renaissance" | "future" = "ancient";
   if (liveFocusTime >= FUTURE_START) {
     currentEra = "future";
@@ -84,9 +86,11 @@ export default function VisitEraScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Visiting {friendData.username}'s Era</Text>
-      <Text style={styles.meta}>🔥 Streak: {friendData.streak || 0} days</Text>
-      <Text style={styles.meta}>⏳ Total Focus Time: {formatDuration(liveFocusTime)}</Text>
+      <Text style={styles.title}>Visiting {friendData.username || "Friend"}'s Era</Text>
+      <Text style={styles.meta}>🔥 Streak: {friendData.streak ?? 0} days</Text>
+      <Text style={styles.meta}>
+        ⏳ Total Focus Time: {formatDuration(liveFocusTime)}
+      </Text>
 
       <EraTransitionWrapper currentEra={currentEra}>
         <MapComponent totalFocusTime={liveFocusTime} />

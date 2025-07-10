@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -26,6 +26,7 @@ import {
   updateDoc,
   arrayUnion,
   arrayRemove,
+  onSnapshot,
 } from "firebase/firestore";
 
 interface User {
@@ -51,12 +52,15 @@ export default function FriendsPage() {
   const [expandedFriendId, setExpandedFriendId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
+  const isFirstLoad = useRef(true);
+  const friendsListeners = useRef<Record<string, () => void>>({});
+
   useEffect(() => {
     const getUserIdAndFetch = async () => {
       const storedId = await AsyncStorage.getItem("userId");
       if (storedId) {
         setCurrentUserId(storedId);
-        fetchFriendsData(storedId);
+        setupSnapshotListeners(storedId);
       } else {
         console.warn("No userId found in AsyncStorage");
         setLoading(false);
@@ -64,33 +68,69 @@ export default function FriendsPage() {
     };
 
     getUserIdAndFetch();
+
+    return () => {
+      // Clean up all listeners on unmount
+      Object.values(friendsListeners.current).forEach((unsub) => unsub());
+    };
   }, []);
 
-  const fetchFriendsData = async (userId: string) => {
-    setLoading(true);
+  const setupSnapshotListeners = async (userId: string) => {
+    const userUnsub = onSnapshot(doc(db, "users", userId), (docSnap) => {
+      if (docSnap.exists()) {
+        fetchFriendsData(userId, docSnap.data());
+      }
+    });
+    friendsListeners.current["currentUser"] = userUnsub;
+  };
+
+  const fetchFriendsData = async (userId: string, userDataFromSnap?: any) => {
+    if (isFirstLoad.current) {
+      setLoading(true);
+    }
+
     try {
-      const userRef = doc(db, "users", userId);
-      const snapshot = await getDoc(userRef);
-
-      if (!snapshot.exists()) throw new Error("User not found");
-
-      const userData = snapshot.data();
+      const userData =
+        userDataFromSnap || (await getDoc(doc(db, "users", userId))).data();
       const friendIds: string[] = userData.friends || [];
       const requestIds: string[] = userData.friendRequests || [];
 
-      const tempUser: User = {
+      setCurrentUser({
         uid: userId,
         username: userData.username || "You",
         totalFocusTime: userData.totalFocusTime || 0,
         streak: userData.streak || 0,
         friends: friendIds,
         friendRequests: requestIds,
-      };
-      setCurrentUser(tempUser);
+      });
 
-      // Load confirmed friends
+      // Clean up old friends listeners
+      Object.entries(friendsListeners.current).forEach(([key, unsub]) => {
+        if (key !== "currentUser") unsub();
+      });
+      friendsListeners.current = { currentUser: friendsListeners.current.currentUser };
+
       const friendsData: User[] = [];
       for (const friendId of friendIds) {
+        const unsub = onSnapshot(doc(db, "users", friendId), (friendSnap) => {
+          if (friendSnap.exists()) {
+            const data = friendSnap.data();
+            const updatedFriend: User = {
+              uid: friendId,
+              username: data.username,
+              totalFocusTime: data.totalFocusTime || 0,
+              streak: data.streak || 0,
+            };
+
+            setFriends((prev) => {
+              const others = prev.filter((f) => f.uid !== friendId);
+              const newFriends = [...others, updatedFriend];
+              return newFriends.sort((a, b) => b.totalFocusTime - a.totalFocusTime);
+            });
+          }
+        });
+        friendsListeners.current[friendId] = unsub;
+
         const friendSnap = await getDoc(doc(db, "users", friendId));
         if (friendSnap.exists()) {
           const data = friendSnap.data();
@@ -102,7 +142,7 @@ export default function FriendsPage() {
           });
         }
       }
-      setFriends(friendsData);
+      setFriends(friendsData.sort((a, b) => b.totalFocusTime - a.totalFocusTime));
 
       // Load pending requests
       const requestsData: User[] = [];
@@ -122,7 +162,10 @@ export default function FriendsPage() {
     } catch (error) {
       console.error("❌ Error loading friends:", error);
     } finally {
-      setLoading(false);
+      if (isFirstLoad.current) {
+        setLoading(false);
+        isFirstLoad.current = false;
+      }
     }
   };
 
@@ -138,10 +181,7 @@ export default function FriendsPage() {
       const snapshot = await getDocs(q);
 
       if (snapshot.empty) {
-        Alert.alert(
-          "User not found",
-          `No user with username "${newUsername}".`
-        );
+        Alert.alert("User not found", `No user with username "${newUsername}".`);
         return;
       }
 
@@ -166,18 +206,12 @@ export default function FriendsPage() {
       const theySentRequest = currentUserData?.friendRequests?.includes(targetId);
 
       if (alreadyFriends) {
-        Alert.alert(
-          "Already Friends",
-          `${newUsername} is already in your friends list.`
-        );
+        Alert.alert("Already Friends", `${newUsername} is already your friend.`);
         return;
       }
 
       if (youSentRequest) {
-        Alert.alert(
-          "Pending",
-          `You already sent a request to ${newUsername}.`
-        );
+        Alert.alert("Pending", `You already sent a request to ${newUsername}.`);
         return;
       }
 
@@ -209,7 +243,7 @@ export default function FriendsPage() {
 
       Alert.alert(
         "Confirm Request",
-        `Are you sure you want to send a friend request to ${newUsername}?`,
+        `Send friend request to ${newUsername}?`,
         [
           { text: "Cancel", style: "cancel" },
           {
@@ -218,10 +252,7 @@ export default function FriendsPage() {
               await updateDoc(targetRef, {
                 friendRequests: arrayUnion(currentUserId),
               });
-              Alert.alert(
-                "Request Sent",
-                `Friend request sent to ${newUsername}.`
-              );
+              Alert.alert("Request Sent", `Friend request sent to ${newUsername}.`);
               setNewUsername("");
             },
           },
@@ -238,20 +269,14 @@ export default function FriendsPage() {
   const acceptRequest = async (requesterId: string) => {
     if (!currentUserId) return;
     try {
-      const currentRef = doc(db, "users", currentUserId);
-      const requesterRef = doc(db, "users", requesterId);
-
-      await updateDoc(currentRef, {
+      await updateDoc(doc(db, "users", currentUserId), {
         friends: arrayUnion(requesterId),
         friendRequests: arrayRemove(requesterId),
       });
-
-      await updateDoc(requesterRef, {
+      await updateDoc(doc(db, "users", requesterId), {
         friends: arrayUnion(currentUserId),
       });
-
       Alert.alert("Success", "Friend request accepted!");
-      fetchFriendsData(currentUserId);
     } catch (err) {
       console.error("Error accepting request:", err);
       Alert.alert("Error", "Unable to accept request.");
@@ -261,13 +286,10 @@ export default function FriendsPage() {
   const rejectRequest = async (requesterId: string) => {
     if (!currentUserId) return;
     try {
-      const currentRef = doc(db, "users", currentUserId);
-      await updateDoc(currentRef, {
+      await updateDoc(doc(db, "users", currentUserId), {
         friendRequests: arrayRemove(requesterId),
       });
-
       Alert.alert("Request Rejected", "Friend request removed.");
-      fetchFriendsData(currentUserId);
     } catch (err) {
       console.error("Error rejecting request:", err);
       Alert.alert("Error", "Unable to reject request.");
@@ -275,35 +297,24 @@ export default function FriendsPage() {
   };
 
   const confirmRemoveFriend = (friendId: string, username: string) => {
-    Alert.alert(
-      "Remove Friend",
-      `Are you sure you want to remove ${username}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: () => removeFriend(friendId),
-        },
-      ]
-    );
+    Alert.alert("Remove Friend", `Remove ${username}?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Remove",
+        style: "destructive",
+        onPress: () => removeFriend(friendId),
+      },
+    ]);
   };
 
   const removeFriend = async (friendId: string) => {
     if (!currentUserId) return;
-    try {
-      await updateDoc(doc(db, "users", currentUserId), {
-        friends: arrayRemove(friendId),
-      });
-      await updateDoc(doc(db, "users", friendId), {
-        friends: arrayRemove(currentUserId),
-      });
-      setExpandedFriendId(null);
-      fetchFriendsData(currentUserId);
-    } catch (err) {
-      console.error("Error removing friend:", err);
-      Alert.alert("Error", "Unable to remove friend.");
-    }
+    await updateDoc(doc(db, "users", currentUserId), {
+      friends: arrayRemove(friendId),
+    });
+    await updateDoc(doc(db, "users", friendId), {
+      friends: arrayRemove(currentUserId),
+    });
   };
 
   const leaderboardData = [...friends];
@@ -312,7 +323,6 @@ export default function FriendsPage() {
 
   const renderItem = ({ item, index }: { item: User; index: number }) => {
     const isMe = item.uid === currentUserId;
-
     return (
       <Swipeable
         renderRightActions={() =>
@@ -385,7 +395,6 @@ export default function FriendsPage() {
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Leaderboard</Text>
-
       <View style={styles.addFriendBox}>
         <TextInput
           placeholder="Enter friend's username"
@@ -427,7 +436,6 @@ export default function FriendsPage() {
                     <Feather name="check" size={16} color="#28a745" />
                     <Text style={styles.acceptText}>Accept</Text>
                   </TouchableOpacity>
-
                   <TouchableOpacity
                     style={styles.rejectButton}
                     onPress={() => rejectRequest(req.uid)}
