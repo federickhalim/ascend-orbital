@@ -3,25 +3,68 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import ConfettiCannon from "react-native-confetti-cannon";
 
 interface Props {
-  onClose: () => void;
+  onOptionSelect: (option: "break" | "continue" | "stop") => void;
+  isBreak?: boolean;
 }
 
-export default function SessionCompleteModal({ onClose }: Props) {
+export default function SessionCompleteModal({
+  onOptionSelect,
+  isBreak,
+}: Props) {
   return (
     <View style={styles.overlay}>
       <View style={styles.box}>
-        <Text style={styles.title}>🎉 Session Complete!</Text>
-        <Text style={styles.text}>
-          Good job staying focused for 25 minutes!
+        <Text style={styles.title}>
+          {isBreak ? "Break Ended!" : "🎉 Session Complete!"}
         </Text>
-        <TouchableOpacity style={styles.button} onPress={onClose}>
-          <Text style={styles.buttonText}>Stop Alarm & Continue</Text>
-        </TouchableOpacity>
-      </View>
+        <Text style={styles.text}>
+          {isBreak
+            ? "Time’s up! Ready for another Session?"
+            : "Good job staying focused for 25 minutes!"}
+        </Text>
 
-      {/* Confetti Animation */}
+        <View style={{ gap: 10 }}>
+          {isBreak ? (
+            <>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() => onOptionSelect("continue")}
+              >
+                <Text style={styles.buttonText}>Start Another Pomodoro</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() => onOptionSelect("stop")}
+              >
+                <Text style={styles.buttonText}>End Session</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() => onOptionSelect("break")}
+              >
+                <Text style={styles.buttonText}>Take 5-min Break</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() => onOptionSelect("continue")}
+              >
+                <Text style={styles.buttonText}>Skip Break & Continue</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() => onOptionSelect("stop")}
+              >
+                <Text style={styles.buttonText}>End Session</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      </View>
       <ConfettiCannon
-        count={100}
+        count={isBreak ? 0 : 100}
         origin={{ x: 200, y: 0 }}
         fadeOut={true}
         fallSpeed={3000}

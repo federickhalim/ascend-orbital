@@ -61,6 +61,8 @@ export default function HomeScreen() {
       : undefined;
   }, [sound]);
 
+  const [isBreakModal, setIsBreakModal] = useState(false);
+
   const [prevRemainingTime, setPrevRemainingTime] = useState(25 * 60);
   const [remainingTime, setRemainingTime] = useState(25 * 60);
 
@@ -68,8 +70,8 @@ export default function HomeScreen() {
   const [lastStudyDate, setLastStudyDate] = useState("");
   const [hasLoadedFromFirestore, setHasLoadedFromFirestore] = useState(false);
 
-  const POMODORO_DURATION = 25 * 60;
-  const BREAK_DURATION = 5 * 60;
+  const POMODORO_DURATION = 5; // 25 * 60
+  const BREAK_DURATION = 5; // 5 * 60
 
   const floatAnim = useRef(new Animated.Value(0)).current;
   const [userId, setUserId] = useState<string | null>(null);
@@ -111,8 +113,9 @@ export default function HomeScreen() {
 
     fetchUserData();
   }, []);
+  const [justFinishedFocus, setJustFinishedFocus] = useState(false);
+  const liveFocusTime = totalFocusTime;
 
-  const liveFocusTime = totalFocusTime + sessionTime;
   const { current, max, label } = getProgressToNextStage(liveFocusTime);
   const progressPercent = Math.min(current / max, 1);
 
@@ -232,20 +235,17 @@ export default function HomeScreen() {
 
     if (remainingTime === 0) {
       playAlarm();
+      setIsBreakModal(pomodoroPhase === "break");
       setShowSessionComplete(true);
 
       if (pomodoroPhase === "focus") {
-        setTotalFocusTime((prev) => prev + duration);
+        setTotalFocusTime((prev) => prev + POMODORO_DURATION);
         updateStreak();
-        setPomodoroPhase("break");
-        setRemainingTime(BREAK_DURATION);
-      } else {
-        setPomodoroPhase("focus");
-        setRemainingTime(POMODORO_DURATION);
+        setJustFinishedFocus(true);
       }
 
-      setSessionTime(0);
       setIsRunning(false);
+      setSessionTime(0);
     }
   }, [remainingTime, isRunning, mode, pomodoroPhase]);
 
@@ -283,13 +283,6 @@ export default function HomeScreen() {
           updateStreak();
         }
         setPrevElapsedTime(elapsedTime);
-      } else if (mode === "pomodoro" && pomodoroPhase === "focus") {
-        const timeSpent = prevRemainingTime - remainingTime;
-        if (timeSpent > 0) {
-          setTotalFocusTime((prev) => prev + timeSpent);
-          updateStreak();
-        }
-        setPrevRemainingTime(remainingTime);
       }
     } else {
       if (mode === "stopwatch") {
@@ -435,13 +428,29 @@ export default function HomeScreen() {
       </TouchableOpacity>
       {showSessionComplete && (
         <SessionCompleteModal
-          onClose={() => {
+          isBreak={isBreakModal}
+          onOptionSelect={(option) => {
             sound?.stopAsync();
+
             setShowSessionComplete(false);
-            setPomodoroPhase("break");
-            setRemainingTime(BREAK_DURATION);
-            setIsRunning(false);
-            setSessionTime(0);
+            setIsBreakModal(false);
+            setJustFinishedFocus(false);
+
+            if (option === "break") {
+              setPomodoroPhase("break");
+              setRemainingTime(BREAK_DURATION);
+              setIsRunning(true);
+            } else if (option === "continue") {
+              setPomodoroPhase("focus");
+              setRemainingTime(POMODORO_DURATION);
+              setIsRunning(true);
+            } else {
+              setIsRunning(false);
+              setPomodoroPhase("focus");
+              setRemainingTime(POMODORO_DURATION);
+              setPrevRemainingTime(POMODORO_DURATION);
+              setSessionTime(0);
+            }
           }}
         />
       )}
