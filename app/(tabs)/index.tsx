@@ -19,7 +19,9 @@ import EraTransitionWrapper from "@/components/EraTransitionWrapper";
 import { getProgressToNextStage } from "@/utils/getProgressToNextStage";
 import { RENAISSANCE_START, FUTURE_START } from "@/config/eraThresholdConfig";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { formatDuration } from "@/utils/formatDuration"; 
+import { formatDuration } from "@/utils/formatDuration";
+import { Audio } from "expo-av";
+import SessionCompleteModal from "@/components/SessionCompleteModal";
 
 const router = useRouter();
 
@@ -35,6 +37,32 @@ export default function HomeScreen() {
   const [sessionTime, setSessionTime] = useState(0);
 
   const [pomodoroPhase, setPomodoroPhase] = useState<PomodoroPhase>("focus");
+  const [showSessionComplete, setShowSessionComplete] = useState(false);
+
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+
+  const playAlarm = async () => {
+    try {
+      const { sound } = await Audio.Sound.createAsync(
+        require("@/assets/ringtone/timer.mp3")
+      );
+      setSound(sound);
+      await sound.playAsync();
+    } catch (error) {
+      console.error("Failed to play sound:", error);
+    }
+  };
+
+  useEffect(() => {
+    return sound
+      ? () => {
+          sound.unloadAsync();
+        }
+      : undefined;
+  }, [sound]);
+
+  const [isBreakModal, setIsBreakModal] = useState(false);
+
   const [prevRemainingTime, setPrevRemainingTime] = useState(25 * 60);
   const [remainingTime, setRemainingTime] = useState(25 * 60);
 
@@ -42,8 +70,8 @@ export default function HomeScreen() {
   const [lastStudyDate, setLastStudyDate] = useState("");
   const [hasLoadedFromFirestore, setHasLoadedFromFirestore] = useState(false);
 
-  const POMODORO_DURATION = 25 * 60;
-  const BREAK_DURATION = 5 * 60;
+  const POMODORO_DURATION = 5; // 25 * 60
+  const BREAK_DURATION = 5; // 5 * 60
 
   const floatAnim = useRef(new Animated.Value(0)).current;
   const [userId, setUserId] = useState<string | null>(null);
@@ -85,8 +113,9 @@ export default function HomeScreen() {
 
     fetchUserData();
   }, []);
+  const [justFinishedFocus, setJustFinishedFocus] = useState(false);
+  const liveFocusTime = totalFocusTime;
 
-  const liveFocusTime = totalFocusTime + sessionTime;
   const { current, max, label } = getProgressToNextStage(liveFocusTime);
   const progressPercent = Math.min(current / max, 1);
 
@@ -205,17 +234,18 @@ export default function HomeScreen() {
       pomodoroPhase === "focus" ? POMODORO_DURATION : BREAK_DURATION;
 
     if (remainingTime === 0) {
+      playAlarm();
+      setIsBreakModal(pomodoroPhase === "break");
+      setShowSessionComplete(true);
+
       if (pomodoroPhase === "focus") {
-        setTotalFocusTime((prev) => prev + duration);
+        setTotalFocusTime((prev) => prev + POMODORO_DURATION);
         updateStreak();
-        setPomodoroPhase("break");
-        setRemainingTime(BREAK_DURATION);
-      } else {
-        setPomodoroPhase("focus");
-        setRemainingTime(POMODORO_DURATION);
+        setJustFinishedFocus(true);
       }
-      setSessionTime(0);
+
       setIsRunning(false);
+      setSessionTime(0);
     }
   }, [remainingTime, isRunning, mode, pomodoroPhase]);
 
@@ -253,13 +283,6 @@ export default function HomeScreen() {
           updateStreak();
         }
         setPrevElapsedTime(elapsedTime);
-      } else if (mode === "pomodoro" && pomodoroPhase === "focus") {
-        const timeSpent = prevRemainingTime - remainingTime;
-        if (timeSpent > 0) {
-          setTotalFocusTime((prev) => prev + timeSpent);
-          updateStreak();
-        }
-        setPrevRemainingTime(remainingTime);
       }
     } else {
       if (mode === "stopwatch") {
@@ -338,7 +361,6 @@ export default function HomeScreen() {
           </Text>
         </View>
       </View>
-
       {/* Character Map */}
       <TouchableOpacity
         onPress={() =>
@@ -365,7 +387,6 @@ export default function HomeScreen() {
           </View>
         </View>
       </TouchableOpacity>
-
       {/* Era Name */}
       <View style={styles.eraNameWrapper}>
         <Text style={styles.eraNameText}>
@@ -382,7 +403,6 @@ export default function HomeScreen() {
           ? formatTime(elapsedTime)
           : formatTime(remainingTime)}
       </Text>
-
       <View style={styles.buttonRow}>
         <TouchableOpacity
           style={[styles.button, isRunning ? styles.stop : styles.start]}
@@ -398,7 +418,6 @@ export default function HomeScreen() {
           <Text style={styles.buttonText}>Reset</Text>
         </TouchableOpacity>
       </View>
-
       <TouchableOpacity
         style={[styles.button, styles.mode]}
         onPress={toggleMode}
@@ -407,6 +426,34 @@ export default function HomeScreen() {
           Switch to {mode === "stopwatch" ? "Pomodoro" : "Stopwatch"}
         </Text>
       </TouchableOpacity>
+      {showSessionComplete && (
+        <SessionCompleteModal
+          isBreak={isBreakModal}
+          onOptionSelect={(option) => {
+            sound?.stopAsync();
+
+            setShowSessionComplete(false);
+            setIsBreakModal(false);
+            setJustFinishedFocus(false);
+
+            if (option === "break") {
+              setPomodoroPhase("break");
+              setRemainingTime(BREAK_DURATION);
+              setIsRunning(true);
+            } else if (option === "continue") {
+              setPomodoroPhase("focus");
+              setRemainingTime(POMODORO_DURATION);
+              setIsRunning(true);
+            } else {
+              setIsRunning(false);
+              setPomodoroPhase("focus");
+              setRemainingTime(POMODORO_DURATION);
+              setPrevRemainingTime(POMODORO_DURATION);
+              setSessionTime(0);
+            }
+          }}
+        />
+      )}
     </View>
   );
 }
