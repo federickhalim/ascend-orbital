@@ -7,6 +7,7 @@ import {
   Animated,
   Easing,
   DimensionValue,
+  Alert,
 } from "react-native";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/firebaseConfig";
@@ -19,7 +20,9 @@ import EraTransitionWrapper from "@/components/EraTransitionWrapper";
 import { getProgressToNextStage } from "@/utils/getProgressToNextStage";
 import { RENAISSANCE_START, FUTURE_START } from "@/config/eraThresholdConfig";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { formatDuration } from "@/utils/formatDuration"; 
+import { formatDuration } from "@/utils/formatDuration";
+import { Audio } from "expo-av";
+import SessionCompleteModal from "@/components/SessionCompleteModal";
 
 const router = useRouter();
 
@@ -27,28 +30,55 @@ type ModeType = "stopwatch" | "pomodoro";
 type PomodoroPhase = "focus" | "break";
 
 export default function HomeScreen() {
+  const POMODORO_DURATION = 25 * 60; 
+  const BREAK_DURATION = 5 * 60; 
+
   const [mode, setMode] = useState<ModeType>("stopwatch");
   const [isRunning, setIsRunning] = useState(false);
+
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [prevElapsedTime, setPrevElapsedTime] = useState(0);
-  const [totalFocusTime, setTotalFocusTime] = useState(0);
   const [sessionTime, setSessionTime] = useState(0);
 
   const [pomodoroPhase, setPomodoroPhase] = useState<PomodoroPhase>("focus");
-  const [prevRemainingTime, setPrevRemainingTime] = useState(25 * 60);
-  const [remainingTime, setRemainingTime] = useState(25 * 60);
+  const [remainingTime, setRemainingTime] = useState(POMODORO_DURATION);
 
   const [streak, setStreak] = useState(0);
   const [lastStudyDate, setLastStudyDate] = useState("");
   const [hasLoadedFromFirestore, setHasLoadedFromFirestore] = useState(false);
 
-  const POMODORO_DURATION = 25 * 60;
-  const BREAK_DURATION = 5 * 60;
+  const [totalFocusTime, setTotalFocusTime] = useState(0);
+
+  const [showSessionComplete, setShowSessionComplete] = useState(false);
+  const [isBreakModal, setIsBreakModal] = useState(false);
 
   const floatAnim = useRef(new Animated.Value(0)).current;
   const [userId, setUserId] = useState<string | null>(null);
-  const [username, setUsername] = useState<string | null>(null); // display username
-  const [checkingAuth, setCheckingAuth] = useState(true); // New state for splash delay
+  const [username, setUsername] = useState<string | null>(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  const wasRunningBeforeResetRef = useRef(false);
+
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+
+  const playAlarm = async () => {
+    try {
+      const { sound } = await Audio.Sound.createAsync(
+        require("@/assets/ringtone/timer.mp3")
+      );
+      setSound(sound);
+      await sound.playAsync();
+    } catch (err) {
+      console.error("Alarm error:", err);
+    }
+  };
+
+  useEffect(() => {
+    return sound
+      ? () => {
+          sound.unloadAsync();
+        }
+      : undefined;
+  }, [sound]);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -65,69 +95,22 @@ export default function HomeScreen() {
 
   useEffect(() => {
     const fetchUserData = async () => {
-      const id = await AsyncStorage.getItem("userId");
-      console.log(" Retrieved userId from storage:", id); // debug
-      if (!id) return;
-
-      setUserId(id);
-
+      if (!userId) return;
       try {
-        const userDoc = await getDoc(doc(db, "users", id));
+        const userDoc = await getDoc(doc(db, "users", userId));
         if (userDoc.exists()) {
           const data = userDoc.data();
           setUsername(data.username || "User");
-          console.log("Fetched username:", data.username); // debug
         }
       } catch (err) {
-        console.error("Failed to fetch username:", err);
+        console.error("Fetch user error:", err);
       }
     };
-
     fetchUserData();
-  }, []);
-
-  const liveFocusTime = totalFocusTime + sessionTime;
-  const { current, max, label } = getProgressToNextStage(liveFocusTime);
-  const progressPercent = Math.min(current / max, 1);
-
-  const currentEra =
-    liveFocusTime >= FUTURE_START
-      ? "future"
-      : liveFocusTime >= RENAISSANCE_START
-      ? "renaissance"
-      : "ancient";
-
-  let MapComponent;
-  if (liveFocusTime >= FUTURE_START) {
-    MapComponent = FutureMap;
-  } else if (liveFocusTime >= RENAISSANCE_START) {
-    MapComponent = RenaissanceMap;
-  } else {
-    MapComponent = AncientMap;
-  }
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(floatAnim, {
-          toValue: -10,
-          duration: 1000,
-          useNativeDriver: true,
-          easing: Easing.inOut(Easing.quad),
-        }),
-        Animated.timing(floatAnim, {
-          toValue: 0,
-          duration: 1000,
-          useNativeDriver: true,
-          easing: Easing.inOut(Easing.quad),
-        }),
-      ])
-    ).start();
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     if (!userId) return;
-
     const fetchFocusTime = async () => {
       try {
         const userRef = doc(db, "users", userId);
@@ -152,8 +135,8 @@ export default function HomeScreen() {
         }
 
         setHasLoadedFromFirestore(true);
-      } catch (error) {
-        console.error("Error fetching focus time:", error);
+      } catch (err) {
+        console.error("Fetch focus time error:", err);
       }
     };
 
@@ -163,21 +146,15 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!hasLoadedFromFirestore) return;
     const saveFocusTime = async () => {
+      if (!userId) return;
       try {
-        if (!userId) return;
-        const userRef = doc(db, "users", userId);
-
         await setDoc(
-          userRef,
-          {
-            totalFocusTime,
-            streak,
-            lastStudyDate,
-          },
+          doc(db, "users", userId),
+          { totalFocusTime, streak, lastStudyDate },
           { merge: true }
         );
-      } catch (error) {
-        console.error("Error saving focus time:", error);
+      } catch (err) {
+        console.error("Save focus time error:", err);
       }
     };
     saveFocusTime();
@@ -192,30 +169,30 @@ export default function HomeScreen() {
           setSessionTime((prev) => prev + 1);
         } else {
           setRemainingTime((prev) => (prev <= 1 ? 0 : prev - 1));
-          setSessionTime((prev) => prev + 1);
+          if (pomodoroPhase === "focus") {
+            setSessionTime((prev) => prev + 1);
+          }
         }
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [isRunning, mode]);
+  }, [isRunning, mode, pomodoroPhase]);
 
   useEffect(() => {
     if (!isRunning || mode !== "pomodoro") return;
-    const duration =
-      pomodoroPhase === "focus" ? POMODORO_DURATION : BREAK_DURATION;
 
     if (remainingTime === 0) {
-      if (pomodoroPhase === "focus") {
-        setTotalFocusTime((prev) => prev + duration);
+      playAlarm();
+      setIsBreakModal(pomodoroPhase === "break");
+      setShowSessionComplete(true);
+
+      if (pomodoroPhase === "focus" && sessionTime > 0) {
+        setTotalFocusTime((prev) => prev + sessionTime);
         updateStreak();
-        setPomodoroPhase("break");
-        setRemainingTime(BREAK_DURATION);
-      } else {
-        setPomodoroPhase("focus");
-        setRemainingTime(POMODORO_DURATION);
       }
-      setSessionTime(0);
+
       setIsRunning(false);
+      setSessionTime(0);
     }
   }, [remainingTime, isRunning, mode, pomodoroPhase]);
 
@@ -234,6 +211,109 @@ export default function HomeScreen() {
     setLastStudyDate(today);
   };
 
+  const actuallyReset = () => {
+    setIsRunning(false);
+    setElapsedTime(0);
+    setSessionTime(0);
+    setPomodoroPhase("focus");
+    if (mode === "pomodoro") {
+      setRemainingTime(POMODORO_DURATION);
+    }
+  };
+
+  const handleReset = () => {
+    if (sessionTime > 0) {
+      wasRunningBeforeResetRef.current = isRunning; 
+      setIsRunning(false);
+
+      Alert.alert(
+        "Confirm Reset",
+        "Are you sure you want to reset? You will lose all progress clocked in this session.",
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+            onPress: () => {
+              setIsRunning(wasRunningBeforeResetRef.current); 
+            },
+          },
+          {
+            text: "Reset",
+            style: "destructive",
+            onPress: () => {
+              actuallyReset();
+            },
+          },
+        ]
+      );
+    } else {
+      actuallyReset();
+    }
+  };
+
+  const handleStartStop = () => {
+    if (isRunning) {
+      setIsRunning(false);
+      if (sessionTime > 0) {
+        setTotalFocusTime((prev) => prev + sessionTime);
+        updateStreak();
+      }
+      setSessionTime(0);
+    } else {
+      setIsRunning(true);
+    }
+  };
+
+  const toggleMode = () => {
+    setIsRunning(false);
+    setElapsedTime(0);
+    setSessionTime(0);
+    setPomodoroPhase("focus");
+    setRemainingTime(POMODORO_DURATION);
+    setMode((prev) => (prev === "stopwatch" ? "pomodoro" : "stopwatch"));
+  };
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(floatAnim, {
+          toValue: -10,
+          duration: 1000,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.quad),
+        }),
+        Animated.timing(floatAnim, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+          easing: Easing.inOut(Easing.quad),
+        }),
+      ])
+    ).start();
+  }, []);
+
+  const liveFocusTime =
+    mode === "pomodoro" && pomodoroPhase === "break"
+      ? totalFocusTime
+      : totalFocusTime + sessionTime;
+
+  const { current, max, label } = getProgressToNextStage(liveFocusTime);
+  const progressPercent = Math.min(current / max, 1);
+
+  const currentEra =
+    liveFocusTime >= FUTURE_START
+      ? "future"
+      : liveFocusTime >= RENAISSANCE_START
+      ? "renaissance"
+      : "ancient";
+
+  const MapComponent =
+    currentEra === "future"
+      ? FutureMap
+      : currentEra === "renaissance"
+      ? RenaissanceMap
+      : AncientMap;
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -242,94 +322,23 @@ export default function HomeScreen() {
       .padStart(2, "0")}`;
   };
 
-  const handleStartStop = () => {
-    if (isRunning) {
-      setIsRunning(false);
-      setSessionTime(0);
-      if (mode === "stopwatch") {
-        const delta = elapsedTime - prevElapsedTime;
-        if (delta > 0) {
-          setTotalFocusTime((prev) => prev + delta);
-          updateStreak();
-        }
-        setPrevElapsedTime(elapsedTime);
-      } else if (mode === "pomodoro" && pomodoroPhase === "focus") {
-        const timeSpent = prevRemainingTime - remainingTime;
-        if (timeSpent > 0) {
-          setTotalFocusTime((prev) => prev + timeSpent);
-          updateStreak();
-        }
-        setPrevRemainingTime(remainingTime);
-      }
-    } else {
-      if (mode === "stopwatch") {
-        setPrevElapsedTime(elapsedTime);
-      } else {
-        setPrevRemainingTime(remainingTime);
-      }
-      setIsRunning(true);
-    }
-  };
-
-  const handleReset = () => {
-    setIsRunning(false);
-    setSessionTime(0);
-    setElapsedTime(0);
-    setPrevElapsedTime(0);
-    setPomodoroPhase("focus");
-    if (mode === "pomodoro") {
-      setRemainingTime(POMODORO_DURATION);
-      setPrevRemainingTime(POMODORO_DURATION);
-    }
-  };
-
-  const toggleMode = () => {
-    setIsRunning(false);
-    setSessionTime(0);
-    setPomodoroPhase("focus");
-    setRemainingTime(POMODORO_DURATION);
-    setPrevRemainingTime(POMODORO_DURATION);
-    setElapsedTime(0);
-    setPrevElapsedTime(0);
-    setMode((prev) => (prev === "stopwatch" ? "pomodoro" : "stopwatch"));
-  };
-  if (checkingAuth) {
-    return null;
-  }
+  if (checkingAuth) return null;
 
   return (
     <View style={styles.container}>
-      {/* Top Stats */}
       <View style={styles.statsBar}>
-        {username && (
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: "600",
-              marginBottom: 8,
-              color: "#4b2e83",
-            }}
-          >
-            Hi, {username}!
-          </Text>
-        )}
+        {username && <Text style={styles.greet}>Hi, {username}!</Text>}
         <Text style={styles.statText}>🔥 Streak: {streak} day(s)</Text>
         <Text style={styles.statText}>
           ⏳ Total: {formatDuration(liveFocusTime)}
         </Text>
-
-        {/* ✅ Embedded Progress Bar */}
         <View style={styles.progressWrapper}>
           <Text style={styles.progressLabel}>{label}</Text>
           <View style={styles.progressBar}>
             <View
               style={[
                 styles.progressFill,
-                {
-                  width: `${(progressPercent * 100).toFixed(
-                    1
-                  )}%` as DimensionValue,
-                },
+                { width: `${progressPercent * 100}%` as DimensionValue },
               ]}
             />
           </View>
@@ -339,7 +348,6 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* Character Map */}
       <TouchableOpacity
         onPress={() =>
           router.push({
@@ -348,34 +356,20 @@ export default function HomeScreen() {
           })
         }
       >
-        <View
-          style={{ marginTop: -50, marginBottom: 10, alignItems: "center" }}
-        >
-          <View
-            style={{
-              marginTop: -50,
-              marginBottom: -10,
-              alignItems: "center",
-              height: (320 * 3) / 4,
-            }}
-          >
-            <EraTransitionWrapper currentEra={currentEra}>
-              <MapComponent totalFocusTime={liveFocusTime} />
-            </EraTransitionWrapper>
-          </View>
+        <View style={styles.mapWrapper}>
+          <EraTransitionWrapper currentEra={currentEra}>
+            <MapComponent totalFocusTime={liveFocusTime} />
+          </EraTransitionWrapper>
         </View>
       </TouchableOpacity>
 
-      {/* Era Name */}
-      <View style={styles.eraNameWrapper}>
-        <Text style={styles.eraNameText}>
-          {currentEra === "ancient"
-            ? "🏺 Ancient Egypt"
-            : currentEra === "renaissance"
-            ? "🎭 Renaissance"
-            : "🛸 Future"}
-        </Text>
-      </View>
+      <Text style={styles.eraNameText}>
+        {currentEra === "ancient"
+          ? "🏺 Ancient Egypt"
+          : currentEra === "renaissance"
+          ? "🎭 Renaissance"
+          : "🛸 Future"}
+      </Text>
 
       <Text style={styles.timer}>
         {mode === "stopwatch"
@@ -399,14 +393,37 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity
-        style={[styles.button, styles.mode]}
-        onPress={toggleMode}
-      >
+      <TouchableOpacity style={[styles.button, styles.mode]} onPress={toggleMode}>
         <Text style={styles.buttonText}>
           Switch to {mode === "stopwatch" ? "Pomodoro" : "Stopwatch"}
         </Text>
       </TouchableOpacity>
+
+      {showSessionComplete && (
+        <SessionCompleteModal
+          isBreak={isBreakModal}
+          onOptionSelect={(option) => {
+            sound?.stopAsync();
+            setShowSessionComplete(false);
+            setIsBreakModal(false);
+
+            if (option === "break") {
+              setPomodoroPhase("break");
+              setRemainingTime(BREAK_DURATION);
+              setIsRunning(true);
+            } else if (option === "continue") {
+              setPomodoroPhase("focus");
+              setRemainingTime(POMODORO_DURATION);
+              setIsRunning(true);
+            } else {
+              setPomodoroPhase("focus");
+              setRemainingTime(POMODORO_DURATION);
+              setSessionTime(0);
+              setIsRunning(false);
+            }
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -425,15 +442,20 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     marginTop: -40,
-    marginBottom: 60,
+    marginBottom: 20,
     alignItems: "center",
-    justifyContent: "center",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 5,
     zIndex: 10,
+  },
+  greet: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#4b2e83",
+    marginBottom: 8,
   },
   statText: {
     fontSize: 18,
@@ -506,13 +528,14 @@ const styles = StyleSheet.create({
     color: "#4b2e83",
     fontWeight: "500",
   },
-  eraNameWrapper: {
-    marginTop: 15,
-    marginBottom: 8,
-  },
   eraNameText: {
     fontSize: 25,
     fontWeight: "700",
     color: "#333",
+  },
+  mapWrapper: {
+    marginTop: -50,
+    marginBottom: 10,
+    alignItems: "center",
   },
 });
