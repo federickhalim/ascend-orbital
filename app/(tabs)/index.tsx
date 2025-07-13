@@ -30,13 +30,11 @@ type ModeType = "stopwatch" | "pomodoro";
 type PomodoroPhase = "focus" | "break";
 
 export default function HomeScreen() {
-  // For testing: use short times
-  const POMODORO_DURATION = 25 * 60;
-  const BREAK_DURATION = 5 * 60;
+  const POMODORO_DURATION = 25 * 60; 
+  const BREAK_DURATION = 5 * 60; 
 
   const [mode, setMode] = useState<ModeType>("stopwatch");
   const [isRunning, setIsRunning] = useState(false);
-  const [wasRunningBeforeReset, setWasRunningBeforeReset] = useState(false);
 
   const [elapsedTime, setElapsedTime] = useState(0);
   const [sessionTime, setSessionTime] = useState(0);
@@ -57,6 +55,8 @@ export default function HomeScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
+
+  const wasRunningBeforeResetRef = useRef(false);
 
   const [sound, setSound] = useState<Audio.Sound | null>(null);
 
@@ -223,7 +223,7 @@ export default function HomeScreen() {
 
   const handleReset = () => {
     if (sessionTime > 0) {
-      setWasRunningBeforeReset(isRunning);
+      wasRunningBeforeResetRef.current = isRunning; 
       setIsRunning(false);
 
       Alert.alert(
@@ -234,7 +234,7 @@ export default function HomeScreen() {
             text: "Cancel",
             style: "cancel",
             onPress: () => {
-              setIsRunning(wasRunningBeforeReset);
+              setIsRunning(wasRunningBeforeResetRef.current); 
             },
           },
           {
