@@ -23,6 +23,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { formatDuration } from "@/utils/formatDuration";
 import { Audio } from "expo-av";
 import SessionCompleteModal from "@/components/SessionCompleteModal";
+import { useFocusEffect } from "expo-router";
+import { useCallback } from "react";
 
 const router = useRouter();
 
@@ -93,21 +95,23 @@ export default function HomeScreen() {
     checkAuth();
   }, []);
 
-  useEffect(() => {
-    const fetchUserData = async () => {
-      if (!userId) return;
-      try {
-        const userDoc = await getDoc(doc(db, "users", userId));
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          setUsername(data.username || "User");
+  useFocusEffect(
+    useCallback(() => {
+      const fetchUserData = async () => {
+        if (!userId) return;
+        try {
+          const userDoc = await getDoc(doc(db, "users", userId));
+          if (userDoc.exists()) {
+            const data = userDoc.data();
+            setUsername(data.username || "User");
+          }
+        } catch (err) {
+          console.error("Fetch user error:", err);
         }
-      } catch (err) {
-        console.error("Fetch user error:", err);
-      }
-    };
-    fetchUserData();
-  }, [userId]);
+      };
+      fetchUserData();
+    }, [userId])
+  );
 
   useEffect(() => {
     if (!userId) return;
