@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "@/firebaseConfig";
 import dayjs from "dayjs";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import AncientMap from "@/components/AncientMap";
 import RenaissanceMap from "@/components/RenaissanceMap";
 import FutureMap from "@/components/FutureMap";
@@ -23,8 +23,6 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { formatDuration } from "@/utils/formatDuration";
 import { Audio } from "expo-av";
 import SessionCompleteModal from "@/components/SessionCompleteModal";
-import { useFocusEffect } from "expo-router";
-import { useCallback } from "react";
 
 const router = useRouter();
 
@@ -32,24 +30,22 @@ type ModeType = "stopwatch" | "pomodoro";
 type PomodoroPhase = "focus" | "break";
 
 export default function HomeScreen() {
-  const POMODORO_DURATION = 25 * 60; 
-  const BREAK_DURATION = 5 * 60; 
+  const POMODORO_DURATION = 5; // test value
+  const BREAK_DURATION = 3;     // test value
 
   const [mode, setMode] = useState<ModeType>("stopwatch");
   const [isRunning, setIsRunning] = useState(false);
-
   const [elapsedTime, setElapsedTime] = useState(0);
   const [sessionTime, setSessionTime] = useState(0);
-
   const [pomodoroPhase, setPomodoroPhase] = useState<PomodoroPhase>("focus");
   const [remainingTime, setRemainingTime] = useState(POMODORO_DURATION);
 
   const [streak, setStreak] = useState(0);
   const [lastStudyDate, setLastStudyDate] = useState("");
-  const [hasLoadedFromFirestore, setHasLoadedFromFirestore] = useState(false);
-
   const [totalFocusTime, setTotalFocusTime] = useState(0);
+  const [dailyLogs, setDailyLogs] = useState<Record<string, number>>({});
 
+  const [hasLoadedFromFirestore, setHasLoadedFromFirestore] = useState(false);
   const [showSessionComplete, setShowSessionComplete] = useState(false);
   const [isBreakModal, setIsBreakModal] = useState(false);
 
@@ -59,7 +55,6 @@ export default function HomeScreen() {
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   const wasRunningBeforeResetRef = useRef(false);
-
   const [sound, setSound] = useState<Audio.Sound | null>(null);
 
   const playAlarm = async () => {
@@ -75,11 +70,10 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
-    return sound
-      ? () => {
-          sound.unloadAsync();
-        }
-      : undefined;
+    if (!sound) return;
+    return () => {
+      sound.unloadAsync();
+    };
   }, [sound]);
 
   useEffect(() => {
@@ -117,33 +111,26 @@ export default function HomeScreen() {
     if (!userId) return;
     const fetchFocusTime = async () => {
       try {
-        const userRef = doc(db, "users", userId);
-        const snapshot = await getDoc(userRef);
-
+        const snapshot = await getDoc(doc(db, "users", userId));
         if (snapshot.exists()) {
           const data = snapshot.data();
           setTotalFocusTime(data.totalFocusTime || 0);
           setStreak(data.streak || 0);
           setLastStudyDate(data.lastStudyDate || "");
+          setDailyLogs(data.dailyLogs || {});
 
+          // Reset streak if needed
           const today = dayjs().format("YYYY-MM-DD");
           const yesterday = dayjs().subtract(1, "day").format("YYYY-MM-DD");
-
-          if (
-            data.lastStudyDate &&
-            data.lastStudyDate !== today &&
-            data.lastStudyDate !== yesterday
-          ) {
+          if (data.lastStudyDate && ![today, yesterday].includes(data.lastStudyDate)) {
             setStreak(0);
           }
         }
-
         setHasLoadedFromFirestore(true);
       } catch (err) {
         console.error("Fetch focus time error:", err);
       }
     };
-
     fetchFocusTime();
   }, [userId]);
 
@@ -154,7 +141,7 @@ export default function HomeScreen() {
       try {
         await setDoc(
           doc(db, "users", userId),
-          { totalFocusTime, streak, lastStudyDate },
+          { totalFocusTime, streak, lastStudyDate, dailyLogs },
           { merge: true }
         );
       } catch (err) {
@@ -162,7 +149,7 @@ export default function HomeScreen() {
       }
     };
     saveFocusTime();
-  }, [totalFocusTime, streak, lastStudyDate, hasLoadedFromFirestore]);
+  }, [totalFocusTime, streak, lastStudyDate, dailyLogs, hasLoadedFromFirestore]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -191,14 +178,26 @@ export default function HomeScreen() {
       setShowSessionComplete(true);
 
       if (pomodoroPhase === "focus" && sessionTime > 0) {
-        setTotalFocusTime((prev) => prev + sessionTime);
-        updateStreak();
+        completeSession(sessionTime);
       }
 
       setIsRunning(false);
       setSessionTime(0);
     }
   }, [remainingTime, isRunning, mode, pomodoroPhase]);
+
+  const completeSession = (time: number) => {
+    const today = dayjs().format("YYYY-MM-DD");
+
+    setTotalFocusTime((prev) => prev + time);
+    setDailyLogs((prev) => ({
+      ...prev,
+      [today]: (prev[today] || 0) + time,
+    }));
+
+    updateStreak();
+    setLastStudyDate(today);
+  };
 
   const updateStreak = () => {
     const today = dayjs().format("YYYY-MM-DD");
@@ -211,7 +210,6 @@ export default function HomeScreen() {
     } else {
       setStreak(1);
     }
-
     setLastStudyDate(today);
   };
 
@@ -227,7 +225,7 @@ export default function HomeScreen() {
 
   const handleReset = () => {
     if (sessionTime > 0) {
-      wasRunningBeforeResetRef.current = isRunning; 
+      wasRunningBeforeResetRef.current = isRunning;
       setIsRunning(false);
 
       Alert.alert(
@@ -238,15 +236,13 @@ export default function HomeScreen() {
             text: "Cancel",
             style: "cancel",
             onPress: () => {
-              setIsRunning(wasRunningBeforeResetRef.current); 
+              setIsRunning(wasRunningBeforeResetRef.current);
             },
           },
           {
             text: "Reset",
             style: "destructive",
-            onPress: () => {
-              actuallyReset();
-            },
+            onPress: actuallyReset,
           },
         ]
       );
@@ -259,8 +255,7 @@ export default function HomeScreen() {
     if (isRunning) {
       setIsRunning(false);
       if (sessionTime > 0) {
-        setTotalFocusTime((prev) => prev + sessionTime);
-        updateStreak();
+        completeSession(sessionTime);
       }
       setSessionTime(0);
     } else {

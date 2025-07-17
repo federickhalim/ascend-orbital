@@ -11,6 +11,12 @@ import { useRouter, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getDoc, deleteDoc, doc } from "firebase/firestore";
 import { db } from "@/firebaseConfig";
+// @ts-ignore
+import Feather from "react-native-vector-icons/Feather";
+// @ts-ignore
+import FontAwesome from "react-native-vector-icons/FontAwesome";
+// @ts-ignore
+import MaterialIcons from "react-native-vector-icons/MaterialIcons";
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -129,32 +135,43 @@ export default function SettingsScreen() {
           style={styles.item}
           onPress={() => router.push("/analytics")}
         >
-          <Text style={styles.itemText}>📈 Study Analytics Dashboard</Text>
+          <View style={styles.rowIconText}>
+            <Feather name="bar-chart" size={18} color="#007bff" style={styles.icon} />
+            <Text style={styles.itemText}>Study Analytics Dashboard</Text>
+          </View>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.item}
           onPress={() => router.push("/badges")}
         >
-          <Text style={styles.itemText}>🏆 Achievement Badges</Text>
+          <View style={styles.rowIconText}>
+            <FontAwesome name="trophy" size={18} color="#007bff" style={styles.icon} />
+            <Text style={styles.itemText}>Achievement Badges</Text>
+          </View>
         </TouchableOpacity>
       </View>
 
       <View style={styles.section}>
         <TouchableOpacity style={styles.item} onPress={handleLogout}>
-          <Text style={styles.itemText}>🚪 Log Out</Text>
+          <View style={styles.rowIconText}>
+            <MaterialIcons name="logout" size={18} color="#007bff" style={styles.icon} />
+            <Text style={styles.itemText}>Log Out</Text>
+          </View>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.item} onPress={handleDeleteAccount}>
-          <Text style={[styles.itemText, styles.destructive]}>
-            🗑️ Delete Account
-          </Text>
+          <View style={styles.rowIconText}>
+            <MaterialIcons name="delete" size={18} color="#dc2626" style={styles.icon} />
+            <Text style={[styles.itemText, styles.destructive]}>Delete Account</Text>
+          </View>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.item} onPress={handleClearData}>
-          <Text style={[styles.itemText, styles.destructive]}>
-            🧹 Clear Login Data
-          </Text>
+          <View style={styles.rowIconText}>
+            <MaterialIcons name="cleaning-services" size={18} color="#dc2626" style={styles.icon} />
+            <Text style={[styles.itemText, styles.destructive]}>Clear Login Data</Text>
+          </View>
         </TouchableOpacity>
       </View>
     </View>
@@ -186,4 +203,11 @@ const styles = StyleSheet.create({
   item: { paddingVertical: 12 },
   itemText: { fontSize: 16, fontWeight: "600" },
   destructive: { color: "#dc2626" },
+  rowIconText: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  icon: {
+    marginRight: 10,
+  },
 });
