@@ -136,8 +136,8 @@ export default function SettingsScreen() {
           onPress={() => router.push("/analytics")}
         >
           <View style={styles.rowIconText}>
-            <Feather name="bar-chart" size={18} color="#007bff" style={styles.icon} />
-            <Text style={styles.itemText}>Study Analytics Dashboard</Text>
+            <MaterialIcons name="insights" size={18} color="#007bff" style={styles.icon} />
+            <Text style={styles.itemText}>Focus Analytics Dashboard</Text>
           </View>
         </TouchableOpacity>
 
