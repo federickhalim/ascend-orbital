@@ -62,8 +62,17 @@ export default function SettingsScreen() {
   };
 
   const handleLogout = async () => {
-    await AsyncStorage.multiRemove(["userId", "userToken"]);
-    router.replace("/login");
+    Alert.alert("Confirm Logout", "Are you sure you want to log out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Log Out",
+        style: "destructive",
+        onPress: async () => {
+          await AsyncStorage.multiRemove(["userId", "userToken"]);
+          router.replace("/login");
+        },
+      },
+    ]);
   };
 
   const handleDeleteAccount = async () => {
@@ -111,8 +120,17 @@ export default function SettingsScreen() {
   };
 
   const handleClearData = async () => {
-    await AsyncStorage.multiRemove(["userId", "userToken"]);
-    Alert.alert("Login data cleared");
+    Alert.alert("Confirm Clear", "Are you sure you want to clear login data?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Clear",
+        style: "destructive",
+        onPress: async () => {
+          await AsyncStorage.multiRemove(["userId", "userToken"]);
+          Alert.alert("Login data cleared");
+        },
+      },
+    ]);
   };
 
   return (
