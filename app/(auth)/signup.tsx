@@ -39,6 +39,16 @@ export default function SignupScreen() {
       return;
     }
 
+    // Validate username format
+    const validUsernameRegex = /^[a-zA-Z0-9._-]+$/;
+    if (!validUsernameRegex.test(username)) {
+      Alert.alert(
+        "Invalid username",
+        "Username can only contain letters, numbers, dots (.), underscores (_), and dashes (-)."
+      );
+      return;
+    }
+
     try {
       const db = getFirestore(app);
 
