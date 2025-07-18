@@ -10,19 +10,19 @@ import {
 const eras = [
   {
     key: "ancient",
-    name: "Ancient Egypt",
+    name: "🏺 Ancient Egypt",
     unlockTime: ANCIENT_START,
     image: require("../assets/images/egypt.png"),
   },
   {
     key: "renaissance",
-    name: "Renaissance",
+    name: "🎭 Renaissance",
     unlockTime: RENAISSANCE_START,
     image: require("../assets/images/renaissance.png"),
   },
   {
     key: "future",
-    name: "Futuristic Era",
+    name: "🛸 Future",
     unlockTime: FUTURE_START,
     image: require("../assets/images/future.png"),
   },
