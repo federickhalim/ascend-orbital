@@ -81,11 +81,24 @@ export default function ProfileScreen() {
   const saveUsername = async () => {
     if (!userId) return;
     const trimmed = username.trim();
+
+    // 1. Empty check
     if (!trimmed) {
       Alert.alert("Invalid username", "Username cannot be empty.");
       return;
     }
 
+    // 2. Character validation
+    const validUsernameRegex = /^[a-zA-Z0-9._-]+$/;
+    if (!validUsernameRegex.test(trimmed)) {
+      Alert.alert(
+        "Invalid username",
+        "Only letters, numbers, dots, underscores, and dashes are allowed."
+      );
+      return;
+    }
+
+    // 3. Uniqueness check
     const q = query(collection(db, "users"), where("username", "==", trimmed));
     const snapshot = await getDocs(q);
     const isTaken = snapshot.docs.some((docSnap) => docSnap.id !== userId);
@@ -95,6 +108,7 @@ export default function ProfileScreen() {
       return;
     }
 
+    // 4. Save
     await updateDoc(doc(db, "users", userId), {
       username: trimmed,
     });
@@ -150,7 +164,12 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, backgroundColor: "#fff", alignItems: "center" },
+  container: {
+    flex: 1,
+    padding: 24,
+    backgroundColor: "#fff",
+    alignItems: "center",
+  },
   avatar: { width: 120, height: 120, borderRadius: 60, marginBottom: 12 },
   picRow: { flexDirection: "row", gap: 12, marginBottom: 20 },
   picOption: { width: 64, height: 64, borderRadius: 32 },
