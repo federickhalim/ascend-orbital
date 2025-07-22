@@ -74,7 +74,7 @@ export default function AnalyticsScreen() {
             const average = totalSeconds / numDays;
             const longest = Math.max(...values);
 
-            setAvgDaily(formatDuration(average));
+            setAvgDaily(formatDuration(Math.round(average)));
             setLongestDaily(formatDuration(longest));
             setTotalDays(numDays.toString());
           } else {
