@@ -9,11 +9,12 @@ import {
   Modal,
   ActivityIndicator,
 } from "react-native";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { db } from "@/firebaseConfig";
 import { badgeConfig, Badge } from "@/constants/badgeConfig";
 
+// 🔒 Static image map for dynamic badges
 const badgeImages: Record<string, any> = {
   "ancientbadge-1": require("@/assets/images/badges/ancientbadge-1.png"),
   "ancientbadge-2": require("@/assets/images/badges/ancientbadge-2.png"),
@@ -51,11 +52,12 @@ export default function BadgesScreen() {
     streak: number;
     totalFocusDays: number;
   } | null>(null);
-
+  const [unlockedBadges, setUnlockedBadges] = useState<string[]>([]);
   const [selectedBadge, setSelectedBadge] = useState<Badge | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Load userId from AsyncStorage
   useEffect(() => {
     const loadUserId = async () => {
       const id = await AsyncStorage.getItem("userId");
@@ -64,6 +66,7 @@ export default function BadgesScreen() {
     loadUserId();
   }, []);
 
+  // Fetch stats + unlocked badge list
   useEffect(() => {
     const fetchUserData = async () => {
       if (!userId) return;
@@ -76,12 +79,12 @@ export default function BadgesScreen() {
           const totalFocusTime = data.totalFocusTime || 0;
           const streak = data.streak || 0;
           const dailyLogs: Record<string, number> = data.dailyLogs || {};
-
           const totalFocusDays = Object.keys(dailyLogs).filter(
             (date) => dailyLogs[date] > 0
           ).length;
 
           setUserStats({ totalFocusTime, streak, totalFocusDays });
+          setUnlockedBadges(data.unlockedBadges || []);
         }
       } catch (err) {
         console.error("Failed to fetch badge data:", err);
@@ -90,10 +93,36 @@ export default function BadgesScreen() {
       }
     };
 
-    if (userId) {
-      fetchUserData();
-    }
+    if (userId) fetchUserData();
   }, [userId]);
+
+  // Unlock new badges if conditions are met
+  useEffect(() => {
+    if (!userStats || !userId) return;
+
+    const newlyUnlocked = badgeConfig
+      .filter((badge) => badge.unlockCondition(userStats))
+      .filter((badge) => !unlockedBadges.includes(badge.filePrefix));
+
+    if (newlyUnlocked.length === 0) return;
+
+    const updated = [...unlockedBadges, ...newlyUnlocked.map((b) => b.filePrefix)];
+
+    const updateBadges = async () => {
+      try {
+        await setDoc(
+          doc(db, "users", userId),
+          { unlockedBadges: updated },
+          { merge: true }
+        );
+        setUnlockedBadges(updated);
+      } catch (err) {
+        console.error("Failed to update unlocked badges:", err);
+      }
+    };
+
+    updateBadges();
+  }, [userStats, userId]);
 
   if (loading || !userStats) {
     return (
@@ -103,8 +132,12 @@ export default function BadgesScreen() {
     );
   }
 
-  const unlocked = badgeConfig.filter((badge) => badge.unlockCondition(userStats));
-  const locked = badgeConfig.filter((badge) => !badge.unlockCondition(userStats));
+  const unlocked = badgeConfig.filter((badge) =>
+    unlockedBadges.includes(badge.filePrefix)
+  );
+  const locked = badgeConfig.filter((badge) =>
+    !unlockedBadges.includes(badge.filePrefix)
+  );
 
   const renderBadge = (badge: Badge, isUnlocked: boolean) => {
     const key = `${badge.filePrefix}-${isUnlocked ? "1" : "2"}`;
