@@ -74,7 +74,7 @@ export default function AnalyticsScreen() {
             const average = totalSeconds / numDays;
             const longest = Math.max(...values);
 
-            setAvgDaily(formatDuration(average));
+            setAvgDaily(formatDuration(Math.round(average)));
             setLongestDaily(formatDuration(longest));
             setTotalDays(numDays.toString());
           } else {
@@ -183,12 +183,12 @@ export default function AnalyticsScreen() {
         <View style={styles.row}>
           <View style={styles.cardItemHalf}>
             <Icon name="bar-chart" size={20} color="#007bff" />
-            <Text style={styles.cardText}>Average Focus</Text>
+            <Text style={styles.cardText}>Average Daily Focus</Text>
             <Text style={styles.cardValue}>{avgDaily}</Text>
           </View>
           <View style={styles.cardItemHalf}>
             <Icon name="clock" size={20} color="#007bff" />
-            <Text style={styles.cardText}>Longest Focus</Text>
+            <Text style={styles.cardText}>Longest Daily Focus</Text>
             <Text style={styles.cardValue}>{longestDaily}</Text>
           </View>
         </View>
