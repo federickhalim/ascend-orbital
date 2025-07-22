@@ -12,6 +12,8 @@ import { formatDuration } from "@/utils/formatDuration";
 import Icon from "react-native-vector-icons/Feather";
 // @ts-ignore
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
+import { formatMarkedDates } from "@/utils/analyticsUtils";
+import { getDailyStats } from "@/utils/analyticsUtils";
 
 dayjs.extend(isoWeek);
 
@@ -67,21 +69,10 @@ export default function AnalyticsScreen() {
           setWeeklyData(trend);
 
           // Daily insights
-          const values = Object.values(dailyLogs);
-          if (values.length > 0) {
-            const totalSeconds = values.reduce((a, b) => a + b, 0);
-            const numDays = values.length;
-            const average = totalSeconds / numDays;
-            const longest = Math.max(...values);
-
-            setAvgDaily(formatDuration(average));
-            setLongestDaily(formatDuration(longest));
-            setTotalDays(numDays.toString());
-          } else {
-            setAvgDaily("0m");
-            setLongestDaily("0m");
-            setTotalDays("0");
-          }
+          const { average, longest, numDays } = getDailyStats(dailyLogs);
+          setAvgDaily(formatDuration(average));
+          setLongestDaily(formatDuration(longest));
+          setTotalDays(numDays.toString());
 
           // Friends Insights (only friends + self)
           const friends: string[] = data.friends || [];
@@ -98,19 +89,26 @@ export default function AnalyticsScreen() {
               totalFocusTime: docSnap.data().totalFocusTime || 0,
             }));
 
-          const sorted = leaderboard.sort((a, b) => b.totalFocusTime - a.totalFocusTime);
+          const sorted = leaderboard.sort(
+            (a, b) => b.totalFocusTime - a.totalFocusTime
+          );
           const myRank = sorted.findIndex((u) => u.id === userId);
           setFriendRank(myRank + 1);
 
-          const outperform = myRank === 0
-            ? 100
-            : Math.round(((sorted.length - myRank - 1) / (sorted.length - 1)) * 100);
+          const outperform =
+            myRank === 0
+              ? 100
+              : Math.round(
+                  ((sorted.length - myRank - 1) / (sorted.length - 1)) * 100
+                );
           setFriendOutperform(outperform);
 
           if (myRank > 0) {
             const above = sorted[myRank - 1];
             const gap = above.totalFocusTime - (data.totalFocusTime || 0);
-            setFriendGapText(`Catch ${above.username} by clocking ${formatDuration(gap)} more`);
+            setFriendGapText(
+              `Catch ${above.username} by clocking ${formatDuration(gap)} more`
+            );
           } else {
             setFriendGapText("You're leading the board!");
           }
@@ -122,10 +120,7 @@ export default function AnalyticsScreen() {
     fetchAnalytics();
   }, [userId]);
 
-  const markedDates = (monthlyLog || []).reduce((acc, date) => {
-    acc[date] = { marked: true, dotColor: "orange" };
-    return acc;
-  }, {} as Record<string, any>);
+  const markedDates = formatMarkedDates(monthlyLog || []);
 
   return (
     <ScrollView style={styles.container}>
@@ -133,12 +128,24 @@ export default function AnalyticsScreen() {
 
       <View style={styles.card}>
         <View style={styles.rowIconText}>
-          <MaterialCommunityIcons name="fire" size={20} color="#007bff" style={styles.iconSpacing} />
+          <MaterialCommunityIcons
+            name="fire"
+            size={20}
+            color="#007bff"
+            style={styles.iconSpacing}
+          />
           <Text style={styles.bigText}>Streak: {streak} day(s)</Text>
         </View>
         <View style={styles.rowIconText}>
-          <MaterialCommunityIcons name="timer-sand" size={20} color="#007bff" style={styles.iconSpacing} />
-          <Text style={styles.bigText}>Total: {formatDuration(totalFocusTime)}</Text>
+          <MaterialCommunityIcons
+            name="timer-sand"
+            size={20}
+            color="#007bff"
+            style={styles.iconSpacing}
+          />
+          <Text style={styles.bigText}>
+            Total: {formatDuration(totalFocusTime)}
+          </Text>
         </View>
       </View>
 

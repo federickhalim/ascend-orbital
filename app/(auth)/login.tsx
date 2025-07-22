@@ -15,6 +15,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { FontAwesome } from "@expo/vector-icons";
 import { Image, ImageBackground } from "react-native";
+import { loginUser, sendPasswordReset } from "@/utils/authUtils";
 
 const FIREBASE_API_KEY = "AIzaSyC6kcCBZoQGxuFAv7VVlY674Ul7C9dyNwU"; // use your actual API key
 
@@ -25,67 +26,31 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [pendingIdToken, setPendingIdToken] = useState<string | null>(null);
+  const [emailSentMessage, setEmailSentMessage] = useState("");
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert("Missing fields", "Please enter both email and password.");
-      return;
-    }
+    const result = await loginUser(email, password);
 
-    try {
-      // Step 1: Login with email/password
-      const res = await fetch(
-        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${FIREBASE_API_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email,
-            password,
-            returnSecureToken: true,
-          }),
-        }
-      );
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        Alert.alert("Login failed", data.error?.message || "Unknown error");
+    switch (result.status) {
+      case "MISSING_FIELDS":
+        Alert.alert("Missing fields", "Please enter both email and password.");
         return;
-      }
-
-      const idToken = data.idToken;
-      const localId = data.localId;
-
-      // Step 2: Check if email is verified
-      const verifyRes = await fetch(
-        `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ idToken }),
-        }
-      );
-
-      const verifyData = await verifyRes.json();
-
-      const isEmailVerified = verifyData.users?.[0]?.emailVerified;
-
-      if (!isEmailVerified) {
-        setPendingIdToken(idToken);
+      case "LOGIN_FAILED":
+        Alert.alert("Login failed", result.message);
+        return;
+      case "UNVERIFIED":
+        console.log("pendingIdToken:", result.idToken); // <- ADD THIS 🔥
+        setPendingIdToken(result.idToken);
         Alert.alert(
           "Email not verified",
-          "Please check your inbox and verify your email before logging in."
+          "Please verify your email before logging in."
         );
         return;
-      }
-
-      // Step 3: Save session info and navigate
-      await AsyncStorage.setItem("userToken", idToken);
-      await AsyncStorage.setItem("userId", localId);
-      router.replace("/(tabs)");
-    } catch (error) {
-      Alert.alert("Login failed", "Something went wrong");
+      case "OK":
+        await AsyncStorage.setItem("userToken", result.idToken);
+        await AsyncStorage.setItem("userId", result.userId);
+        router.replace("/(tabs)");
+        return;
     }
   };
 
@@ -112,6 +77,9 @@ export default function LoginScreen() {
       }
 
       Alert.alert("Email sent", "Verification email has been resent.");
+      setEmailSentMessage("Verification email sent!");
+      setTimeout(() => setEmailSentMessage(""), 3000); // hides after 3s
+
       setPendingIdToken(null); // hide the button after resending
     } catch (error: any) {
       Alert.alert("Error", error.message || "Something went wrong");
@@ -127,28 +95,12 @@ export default function LoginScreen() {
       return;
     }
 
-    try {
-      const res = await fetch(
-        `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${FIREBASE_API_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            requestType: "PASSWORD_RESET",
-            email,
-          }),
-        }
-      );
+    const result = await sendPasswordReset(email);
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error?.message || "Failed to send reset email");
-      }
-
+    if (result === "OK") {
       Alert.alert("Email sent", "Check your inbox to reset your password.");
-    } catch (error: any) {
-      Alert.alert("Error", error.message || "Something went wrong");
+    } else {
+      Alert.alert("Error", result);
     }
   };
 
@@ -172,7 +124,6 @@ export default function LoginScreen() {
             Start your productivity journey now!
           </Text>
         </View>
-
         {/* Email */}
         <View style={styles.inputWrapper}>
           <FontAwesome
@@ -190,7 +141,6 @@ export default function LoginScreen() {
             autoCapitalize="none"
           />
         </View>
-
         {/* Password */}
         <View style={styles.inputWrapper}>
           <FontAwesome
@@ -216,17 +166,24 @@ export default function LoginScreen() {
             />
           </TouchableOpacity>
         </View>
-
         <TouchableOpacity style={styles.signinButton} onPress={handleLogin}>
           <Text style={styles.signinText}>Sign In</Text>
         </TouchableOpacity>
 
+        {pendingIdToken && (
+          <TouchableOpacity onPress={handleResendVerification}>
+            <Text style={styles.resendText}>Resend verification email</Text>
+          </TouchableOpacity>
+        )}
+
+        {emailSentMessage !== "" && (
+          <Text style={styles.sentMessage}>{emailSentMessage}</Text>
+        )}
+
         <TouchableOpacity onPress={handleForgotPassword}>
           <Text style={styles.forgotText}>Forgot your password?</Text>
         </TouchableOpacity>
-
         <Text style={styles.dividerText}>--------- or ---------</Text>
-
         <TouchableOpacity onPress={() => router.push("/signup")}>
           <Text style={styles.signupText}>
             Don’t have an account?{" "}
@@ -302,18 +259,33 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   forgotText: {
-    marginTop: 24,
-    marginBottom: 12,
+    marginTop: 15,
     textAlign: "center",
     fontWeight: "600",
     fontSize: 12,
     color: "#003568",
   },
+  resendText: {
+    marginTop: 20,
+    marginBottom: 8,
+    textAlign: "center",
+    fontWeight: "600",
+    fontSize: 12,
+    color: "#003568",
+  },
+  sentMessage: {
+    textAlign: "center",
+    marginTop: 10,
+    fontSize: 12,
+    color: "green",
+    fontWeight: "500",
+  },
+
   dividerText: {
     textAlign: "center",
     fontWeight: "600",
     fontSize: 12,
-    marginTop: 4,
+    marginTop: 8,
     color: "#003568",
   },
   signupText: {

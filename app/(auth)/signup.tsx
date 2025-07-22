@@ -22,7 +22,11 @@ import {
 } from "firebase/firestore";
 import { app } from "../../firebaseConfig";
 import { Image, ImageBackground } from "react-native";
-import { ScrollView } from "react-native";
+import {
+  isValidUsername,
+  areAllFieldsFilled,
+  getSignupErrorMessage,
+} from "@/utils/validation";
 
 export default function SignupScreen() {
   const FIREBASE_API_KEY = "AIzaSyC6kcCBZoQGxuFAv7VVlY674Ul7C9dyNwU";
@@ -34,14 +38,14 @@ export default function SignupScreen() {
   const [showPassword, setShowPassword] = useState(false);
 
   const handleSignup = async () => {
-    if (!username || !email || !password) {
+    if (!areAllFieldsFilled(username, email, password)) {
       Alert.alert("Missing fields", "Please fill in all fields.");
       return;
     }
 
     // Validate username format
-    const validUsernameRegex = /^[a-zA-Z0-9._-]+$/;
-    if (!validUsernameRegex.test(username)) {
+    // NEW:
+    if (!isValidUsername(username)) {
       Alert.alert(
         "Invalid username",
         "Username can only contain letters, numbers, dots (.), underscores (_), and dashes (-)."
@@ -83,11 +87,9 @@ export default function SignupScreen() {
       const data = await response.json();
 
       if (!response.ok) {
-        if (data.error?.message === "EMAIL_EXISTS") {
-          Alert.alert("Email already registered", "Please log in instead.");
-          return;
-        }
-        throw new Error(data.error?.message || "Signup failed");
+        const errorMessage = getSignupErrorMessage(data.error);
+        Alert.alert("Signup failed", errorMessage);
+        return;
       }
 
       const uid = data.localId;
