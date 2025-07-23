@@ -20,6 +20,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "@/firebaseConfig";
+import { getProfileImageName } from "@/utils/profileUtils";
 
 const profilePics = [
   require("@/assets/images/profile/sphinx-profile.png"),
@@ -117,11 +118,10 @@ export default function ProfileScreen() {
   };
 
   const getLocalImage = () => {
-    const local = photoURL || "sphinx-profile.png";
-    if (local.includes("sphinx")) return profilePics[0];
-    if (local.includes("griffin")) return profilePics[1];
-    if (local.includes("robot")) return profilePics[2];
-    return profilePics[0];
+    const profileType = getProfileImageName(photoURL || "sphinx-profile.png");
+    const index =
+      profileType === "griffin" ? 1 : profileType === "robot" ? 2 : 0;
+    return profilePics[index];
   };
 
   return (

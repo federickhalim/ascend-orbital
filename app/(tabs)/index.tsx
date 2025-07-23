@@ -23,6 +23,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { formatDuration } from "@/utils/formatDuration";
 import { Audio } from "expo-av";
 import SessionCompleteModal from "@/components/SessionCompleteModal";
+import { getSessionUpdate } from "@/utils/sessionUtils";
+import { formatTime } from "@/utils/timeUtils";
+import { getCurrentEra } from "@/utils/eraUtils";
+// @ts-ignore
+import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 
 const router = useRouter();
 
@@ -31,7 +36,7 @@ type PomodoroPhase = "focus" | "break";
 
 export default function HomeScreen() {
   const POMODORO_DURATION = 5; // test value
-  const BREAK_DURATION = 3;     // test value
+  const BREAK_DURATION = 3; // test value
 
   const [mode, setMode] = useState<ModeType>("stopwatch");
   const [isRunning, setIsRunning] = useState(false);
@@ -122,7 +127,10 @@ export default function HomeScreen() {
           // Reset streak if needed
           const today = dayjs().format("YYYY-MM-DD");
           const yesterday = dayjs().subtract(1, "day").format("YYYY-MM-DD");
-          if (data.lastStudyDate && ![today, yesterday].includes(data.lastStudyDate)) {
+          if (
+            data.lastStudyDate &&
+            ![today, yesterday].includes(data.lastStudyDate)
+          ) {
             setStreak(0);
           }
         }
@@ -149,7 +157,13 @@ export default function HomeScreen() {
       }
     };
     saveFocusTime();
-  }, [totalFocusTime, streak, lastStudyDate, dailyLogs, hasLoadedFromFirestore]);
+  }, [
+    totalFocusTime,
+    streak,
+    lastStudyDate,
+    dailyLogs,
+    hasLoadedFromFirestore,
+  ]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -187,14 +201,14 @@ export default function HomeScreen() {
   }, [remainingTime, isRunning, mode, pomodoroPhase]);
 
   const completeSession = (time: number) => {
-    const today = dayjs().format("YYYY-MM-DD");
+    const { updatedFocusTime, updatedLogs, today } = getSessionUpdate(
+      totalFocusTime,
+      dailyLogs,
+      time
+    );
 
-    setTotalFocusTime((prev) => prev + time);
-    setDailyLogs((prev) => ({
-      ...prev,
-      [today]: (prev[today] || 0) + time,
-    }));
-
+    setTotalFocusTime(updatedFocusTime);
+    setDailyLogs(updatedLogs);
     updateStreak();
     setLastStudyDate(today);
   };
@@ -299,12 +313,7 @@ export default function HomeScreen() {
   const { current, max, label } = getProgressToNextStage(liveFocusTime);
   const progressPercent = Math.min(current / max, 1);
 
-  const currentEra =
-    liveFocusTime >= FUTURE_START
-      ? "future"
-      : liveFocusTime >= RENAISSANCE_START
-      ? "renaissance"
-      : "ancient";
+  const currentEra = getCurrentEra(liveFocusTime);
 
   const MapComponent =
     currentEra === "future"
@@ -313,24 +322,33 @@ export default function HomeScreen() {
       ? RenaissanceMap
       : AncientMap;
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs
-      .toString()
-      .padStart(2, "0")}`;
-  };
-
   if (checkingAuth) return null;
 
   return (
     <View style={styles.container}>
       <View style={styles.statsBar}>
         {username && <Text style={styles.greet}>Hi, {username}!</Text>}
-        <Text style={styles.statText}>🔥 Streak: {streak} day(s)</Text>
-        <Text style={styles.statText}>
-          ⏳ Total: {formatDuration(liveFocusTime)}
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <MaterialCommunityIcons
+            name="fire"
+            size={20}
+            color="#ff4500"
+            style={{ marginRight: 3 }}
+          />
+          <Text style={styles.statText}>Streak: {streak} day(s)</Text>
+        </View>
+
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <MaterialCommunityIcons
+            name="timer-sand"
+            size={20}
+            color="#007bff"
+            style={{ marginRight: 3 }}
+          />
+          <Text style={styles.statText}>
+            Total: {formatDuration(liveFocusTime)}
+          </Text>
+        </View>
         <View style={styles.progressWrapper}>
           <Text style={styles.progressLabel}>{label}</Text>
           <View style={styles.progressBar}>
@@ -392,7 +410,10 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={[styles.button, styles.mode]} onPress={toggleMode}>
+      <TouchableOpacity
+        style={[styles.button, styles.mode]}
+        onPress={toggleMode}
+      >
         <Text style={styles.buttonText}>
           Switch to {mode === "stopwatch" ? "Pomodoro" : "Stopwatch"}
         </Text>

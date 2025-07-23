@@ -28,8 +28,10 @@ import {
   arrayRemove,
   onSnapshot,
 } from "firebase/firestore";
+import { validateAddFriend } from "@/utils/friendUtils";
+import { getSortedLeaderboard } from "../../utils/friendsUtils";
 
-interface User {
+export interface User {
   uid: string;
   username: string;
   totalFocusTime: number;
@@ -108,7 +110,9 @@ export default function FriendsPage() {
       Object.entries(friendsListeners.current).forEach(([key, unsub]) => {
         if (key !== "currentUser") unsub();
       });
-      friendsListeners.current = { currentUser: friendsListeners.current.currentUser };
+      friendsListeners.current = {
+        currentUser: friendsListeners.current.currentUser,
+      };
 
       const friendsData: User[] = [];
       for (const friendId of friendIds) {
@@ -125,7 +129,9 @@ export default function FriendsPage() {
             setFriends((prev) => {
               const others = prev.filter((f) => f.uid !== friendId);
               const newFriends = [...others, updatedFriend];
-              return newFriends.sort((a, b) => b.totalFocusTime - a.totalFocusTime);
+              return newFriends.sort(
+                (a, b) => b.totalFocusTime - a.totalFocusTime
+              );
             });
           }
         });
@@ -142,7 +148,9 @@ export default function FriendsPage() {
           });
         }
       }
-      setFriends(friendsData.sort((a, b) => b.totalFocusTime - a.totalFocusTime));
+      setFriends(
+        friendsData.sort((a, b) => b.totalFocusTime - a.totalFocusTime)
+      );
 
       // Load pending requests
       const requestsData: User[] = [];
@@ -181,7 +189,10 @@ export default function FriendsPage() {
       const snapshot = await getDocs(q);
 
       if (snapshot.empty) {
-        Alert.alert("User not found", `No user with username "${newUsername}".`);
+        Alert.alert(
+          "User not found",
+          `No user with username "${newUsername}".`
+        );
         return;
       }
 
@@ -201,21 +212,26 @@ export default function FriendsPage() {
       const targetSnap = await getDoc(targetRef);
       const targetData = targetSnap.data();
 
-      const alreadyFriends = currentUserData?.friends?.includes(targetId);
-      const youSentRequest = targetData?.friendRequests?.includes(currentUserId);
-      const theySentRequest = currentUserData?.friendRequests?.includes(targetId);
+      const result = validateAddFriend(
+        currentUserId,
+        targetId,
+        currentUserData || {},
+        targetData || {}
+      );
 
-      if (alreadyFriends) {
-        Alert.alert("Already Friends", `${newUsername} is already your friend.`);
+      if (result === "self") {
+        Alert.alert("Invalid", "You cannot add yourself.");
         return;
-      }
-
-      if (youSentRequest) {
+      } else if (result === "alreadyFriends") {
+        Alert.alert(
+          "Already Friends",
+          `${newUsername} is already your friend.`
+        );
+        return;
+      } else if (result === "youSentRequest") {
         Alert.alert("Pending", `You already sent a request to ${newUsername}.`);
         return;
-      }
-
-      if (theySentRequest) {
+      } else if (result === "theySentRequest") {
         Alert.alert(
           "Confirm Accept",
           `${newUsername} has requested to add you! Accept now?`,
@@ -231,33 +247,36 @@ export default function FriendsPage() {
                 await updateDoc(targetRef, {
                   friends: arrayUnion(currentUserId),
                 });
-                Alert.alert("Friend Added", `You are now friends with ${newUsername}!`);
+                Alert.alert(
+                  "Friend Added",
+                  `You are now friends with ${newUsername}!`
+                );
                 setNewUsername("");
                 fetchFriendsData(currentUserId);
               },
             },
           ]
         );
+
         return;
       }
 
-      Alert.alert(
-        "Confirm Request",
-        `Send friend request to ${newUsername}?`,
-        [
-          { text: "Cancel", style: "cancel" },
-          {
-            text: "Send Request",
-            onPress: async () => {
-              await updateDoc(targetRef, {
-                friendRequests: arrayUnion(currentUserId),
-              });
-              Alert.alert("Request Sent", `Friend request sent to ${newUsername}.`);
-              setNewUsername("");
-            },
+      Alert.alert("Confirm Request", `Send friend request to ${newUsername}?`, [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Send Request",
+          onPress: async () => {
+            await updateDoc(targetRef, {
+              friendRequests: arrayUnion(currentUserId),
+            });
+            Alert.alert(
+              "Request Sent",
+              `Friend request sent to ${newUsername}.`
+            );
+            setNewUsername("");
           },
-        ]
-      );
+        },
+      ]);
     } catch (err) {
       console.error("Error adding friend:", err);
       Alert.alert("Error", "Something went wrong.");
@@ -317,9 +336,7 @@ export default function FriendsPage() {
     });
   };
 
-  const leaderboardData = [...friends];
-  if (currentUser) leaderboardData.push(currentUser);
-  leaderboardData.sort((a, b) => b.totalFocusTime - a.totalFocusTime);
+  const leaderboardData = getSortedLeaderboard(friends, currentUser);
 
   const renderItem = ({ item, index }: { item: User; index: number }) => {
     const isMe = item.uid === currentUserId;
@@ -332,23 +349,16 @@ export default function FriendsPage() {
         <TouchableOpacity
           onPress={() =>
             !isMe &&
-            setExpandedFriendId(
-              expandedFriendId === item.uid ? null : item.uid
-            )
+            setExpandedFriendId(expandedFriendId === item.uid ? null : item.uid)
           }
         >
-          <View
-            style={[
-              styles.card,
-              isMe && { backgroundColor: "#e6f7ff" },
-            ]}
-          >
+          <View style={[styles.card, isMe && { backgroundColor: "#e6f7ff" }]}>
             <Text style={styles.rank}>#{index + 1}</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.name}>{isMe ? "You" : item.username}</Text>
               <Text style={styles.meta}>
-                Focus Time: {Math.floor(item.totalFocusTime / 60)} mins • Streak:{" "}
-                {item.streak}
+                Focus Time: {Math.floor(item.totalFocusTime / 60)} mins •
+                Streak: {item.streak}
               </Text>
             </View>
           </View>

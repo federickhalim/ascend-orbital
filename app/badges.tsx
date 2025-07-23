@@ -13,6 +13,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { db } from "@/firebaseConfig";
 import { badgeConfig, Badge } from "@/constants/badgeConfig";
+import { splitBadgesByUnlockStatus } from "@/utils/badgeUtils";
 
 // 🔒 Static image map for dynamic badges
 const badgeImages: Record<string, any> = {
@@ -106,7 +107,10 @@ export default function BadgesScreen() {
 
     if (newlyUnlocked.length === 0) return;
 
-    const updated = [...unlockedBadges, ...newlyUnlocked.map((b) => b.filePrefix)];
+    const updated = [
+      ...unlockedBadges,
+      ...newlyUnlocked.map((b) => b.filePrefix),
+    ];
 
     const updateBadges = async () => {
       try {
@@ -132,11 +136,9 @@ export default function BadgesScreen() {
     );
   }
 
-  const unlocked = badgeConfig.filter((badge) =>
-    unlockedBadges.includes(badge.filePrefix)
-  );
-  const locked = badgeConfig.filter((badge) =>
-    !unlockedBadges.includes(badge.filePrefix)
+  const { unlocked, locked } = splitBadgesByUnlockStatus(
+    badgeConfig,
+    unlockedBadges
   );
 
   const renderBadge = (badge: Badge, isUnlocked: boolean) => {
