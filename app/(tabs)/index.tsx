@@ -26,6 +26,8 @@ import SessionCompleteModal from "@/components/SessionCompleteModal";
 import { getSessionUpdate } from "@/utils/sessionUtils";
 import { formatTime } from "@/utils/timeUtils";
 import { getCurrentEra } from "@/utils/eraUtils";
+// @ts-ignore
+import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 
 const router = useRouter();
 
@@ -326,10 +328,27 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <View style={styles.statsBar}>
         {username && <Text style={styles.greet}>Hi, {username}!</Text>}
-        <Text style={styles.statText}>🔥 Streak: {streak} day(s)</Text>
-        <Text style={styles.statText}>
-          ⏳ Total: {formatDuration(liveFocusTime)}
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <MaterialCommunityIcons
+            name="fire"
+            size={20}
+            color="#ff4500"
+            style={{ marginRight: 3 }}
+          />
+          <Text style={styles.statText}>Streak: {streak} day(s)</Text>
+        </View>
+
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <MaterialCommunityIcons
+            name="timer-sand"
+            size={20}
+            color="#007bff"
+            style={{ marginRight: 3 }}
+          />
+          <Text style={styles.statText}>
+            Total: {formatDuration(liveFocusTime)}
+          </Text>
+        </View>
         <View style={styles.progressWrapper}>
           <Text style={styles.progressLabel}>{label}</Text>
           <View style={styles.progressBar}>

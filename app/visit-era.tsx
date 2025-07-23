@@ -10,6 +10,10 @@ import FutureMap from "@/components/FutureMap";
 import EraTransitionWrapper from "@/components/EraTransitionWrapper";
 import { RENAISSANCE_START, FUTURE_START } from "@/config/eraThresholdConfig";
 import { formatDuration } from "@/utils/formatDuration";
+// @ts-ignore
+import Icon from "react-native-vector-icons/Feather";
+// @ts-ignore
+import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 
 interface User {
   username?: string;
@@ -86,11 +90,29 @@ export default function VisitEraScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Visiting {friendData.username || "Friend"}'s Era</Text>
-      <Text style={styles.meta}>🔥 Streak: {friendData.streak ?? 0} days</Text>
-      <Text style={styles.meta}>
-        ⏳ Total Focus Time: {formatDuration(liveFocusTime)}
+      <Text style={styles.title}>
+        Visiting {friendData.username || "Friend"}'s Era
       </Text>
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <MaterialCommunityIcons
+          name="fire"
+          size={20}
+          color="#ff4500"
+          style={{ marginRight: 3 }}
+        />
+        <Text style={styles.meta}>Streak: {friendData.streak ?? 0} days</Text>
+      </View>
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <MaterialCommunityIcons
+          name="timer-sand"
+          size={20}
+          color="#007bff"
+          style={{ marginRight: 3 }}
+        />
+        <Text style={styles.meta}>
+          Total Focus Time: {formatDuration(liveFocusTime)}
+        </Text>
+      </View>
 
       <EraTransitionWrapper currentEra={currentEra}>
         <MapComponent totalFocusTime={liveFocusTime} />
@@ -108,9 +130,14 @@ export default function VisitEraScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: "center", paddingTop: 60, backgroundColor: "#f7f7f7" },
+  container: {
+    flex: 1,
+    alignItems: "center",
+    paddingTop: 60,
+    backgroundColor: "#f7f7f7",
+  },
   title: { fontSize: 22, fontWeight: "bold", marginBottom: 8, color: "#333" },
-  meta: { fontSize: 16, color: "#555", marginBottom: 4 },
+  meta: { fontSize: 16, color: "#555", marginBottom: 0 },
   eraLabel: { marginTop: 12, fontSize: 18, fontWeight: "600", color: "#333" },
   loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
 });
