@@ -71,7 +71,7 @@ export default function AnalyticsScreen() {
           setWeeklyData(trend);
 
           const { average, longest, numDays } = getDailyStats(dailyLogs);
-          setAvgDaily(formatDuration(average));
+          setAvgDaily(formatDuration(Math.round(average)));
           setLongestDaily(formatDuration(longest));
           setTotalDays(numDays.toString());
 
