@@ -12,9 +12,9 @@ export type BadgeCategory =
   | "Total Focus Days";
 
 export interface BadgeStats {
-  totalFocusTime: number; // in seconds
-  streak: number; // consecutive days
-  totalFocusDays: number; // days with > 0 seconds
+  totalFocusTime: number; 
+  streak: number; 
+  totalFocusDays: number; 
 }
 
 export interface Badge {
@@ -26,36 +26,36 @@ export interface Badge {
 }
 
 export const badgeConfig: Badge[] = [
-  // 🗺️ Era Progression
+  // Era Progression
   {
     category: "Era Progression",
     filePrefix: "ancientbadge",
     name: "Conqueror of Egypt",
-    description: "You’ve completed the Ancient Era — welcome to the Renaissance",
+    description: "You’ve completed the Ancient Egypt Era — welcome to the Renaissance",
     unlockCondition: (stats) => stats.totalFocusTime >= RENAISSANCE_START,
   },
   {
     category: "Era Progression",
     filePrefix: "renaissancebadge",
     name: "Ruler of the Renaissance",
-    description: "You've surpassed the Renaissance Era — Forward to the future",
+    description: "You've surpassed the Renaissance Era — Forward to the Future",
     unlockCondition: (stats) => stats.totalFocusTime >= FUTURE_START,
   },
   {
     category: "Era Progression",
     filePrefix: "futurebadge",
     name: "Beyond Time",
-    description: "You've reached the final era — Focus has carried you into the future",
+    description: "You've transcended the final era — Focus has carried you beyond the Future",
     unlockCondition: (stats) =>
       stats.totalFocusTime >= FUTURE_START + LEVELS_PER_ERA * SECONDS_PER_LEVEL,
   },
 
-  // ⏳ Total Focus Time (in seconds)
+  //Total Focus Time (in seconds)
   {
     category: "Total Focus Time",
     filePrefix: "totaltime10",
     name: "The First Decahour",
-    description: "Logged your first 10 hours of focused time — the journey begins",
+    description: "Logged your first 10 hours of focus time — the journey begins",
     unlockCondition: (stats) => stats.totalFocusTime >= 10 * 3600,
   },
   {
@@ -73,7 +73,7 @@ export const badgeConfig: Badge[] = [
     unlockCondition: (stats) => stats.totalFocusTime >= 1000 * 3600,
   },
 
-  // 🔥 Streaks
+  //Streaks
   {
     category: "Streaks",
     filePrefix: "streak10",

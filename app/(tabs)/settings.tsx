@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Alert,
   Image,
+  ImageBackground,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -134,70 +135,76 @@ export default function SettingsScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.profileSection}
-        onPress={() => router.push("/profile")}
-      >
-        <Image source={getLocalImage()} style={styles.avatar} />
-        <View>
-          <Text style={styles.profileName}>
-            {profile.username || "Unnamed User"}
-          </Text>
-          <Text style={styles.profileEdit}>View and edit profile</Text>
+    <ImageBackground
+      source={require("@/assets/images/settings-profile-bg.png")}
+      style={{ flex: 1 }}
+      resizeMode="cover"
+    >
+      <View style={styles.container}>
+        <TouchableOpacity
+          style={styles.profileSection}
+          onPress={() => router.push("/profile")}
+        >
+          <Image source={getLocalImage()} style={styles.avatar} />
+          <View>
+            <Text style={styles.profileName}>
+              {profile.username || "Unnamed User"}
+            </Text>
+            <Text style={styles.profileEdit}>View and edit profile</Text>
+          </View>
+        </TouchableOpacity>
+
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.item}
+            onPress={() => router.push("/analytics")}
+          >
+            <View style={styles.rowIconText}>
+              <MaterialIcons name="insights" size={18} color="#007bff" style={styles.icon} />
+              <Text style={styles.itemText}>Focus Analytics Dashboard</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.item}
+            onPress={() => router.push("/badges")}
+          >
+            <View style={styles.rowIconText}>
+              <FontAwesome name="trophy" size={18} color="#007bff" style={styles.icon} />
+              <Text style={styles.itemText}>Achievement Badges</Text>
+            </View>
+          </TouchableOpacity>
         </View>
-      </TouchableOpacity>
 
-      <View style={styles.section}>
-        <TouchableOpacity
-          style={styles.item}
-          onPress={() => router.push("/analytics")}
-        >
-          <View style={styles.rowIconText}>
-            <MaterialIcons name="insights" size={18} color="#007bff" style={styles.icon} />
-            <Text style={styles.itemText}>Focus Analytics Dashboard</Text>
-          </View>
-        </TouchableOpacity>
+        <View style={styles.section}>
+          <TouchableOpacity style={styles.item} onPress={handleLogout}>
+            <View style={styles.rowIconText}>
+              <MaterialIcons name="logout" size={18} color="#007bff" style={styles.icon} />
+              <Text style={styles.itemText}>Log Out</Text>
+            </View>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.item}
-          onPress={() => router.push("/badges")}
-        >
-          <View style={styles.rowIconText}>
-            <FontAwesome name="trophy" size={18} color="#007bff" style={styles.icon} />
-            <Text style={styles.itemText}>Achievement Badges</Text>
-          </View>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.item} onPress={handleDeleteAccount}>
+            <View style={styles.rowIconText}>
+              <MaterialIcons name="delete" size={18} color="#dc2626" style={styles.icon} />
+              <Text style={[styles.itemText, styles.destructive]}>Delete Account</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.item} onPress={handleClearData}>
+            <View style={styles.rowIconText}>
+              <MaterialIcons name="cleaning-services" size={18} color="#dc2626" style={styles.icon} />
+              <Text style={[styles.itemText, styles.destructive]}>Clear Login Data</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
-
-      <View style={styles.section}>
-        <TouchableOpacity style={styles.item} onPress={handleLogout}>
-          <View style={styles.rowIconText}>
-            <MaterialIcons name="logout" size={18} color="#007bff" style={styles.icon} />
-            <Text style={styles.itemText}>Log Out</Text>
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.item} onPress={handleDeleteAccount}>
-          <View style={styles.rowIconText}>
-            <MaterialIcons name="delete" size={18} color="#dc2626" style={styles.icon} />
-            <Text style={[styles.itemText, styles.destructive]}>Delete Account</Text>
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.item} onPress={handleClearData}>
-          <View style={styles.rowIconText}>
-            <MaterialIcons name="cleaning-services" size={18} color="#dc2626" style={styles.icon} />
-            <Text style={[styles.itemText, styles.destructive]}>Clear Login Data</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-    </View>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, backgroundColor: "#fff" },
+  container: { flex: 1, padding: 24, backgroundColor: "transparent" },
   profileSection: {
     flexDirection: "row",
     alignItems: "center",
