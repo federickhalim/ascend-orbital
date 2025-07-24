@@ -30,6 +30,7 @@ import {
 } from "firebase/firestore";
 import { validateAddFriend } from "@/utils/friendUtils";
 import { getSortedLeaderboard } from "../../utils/friendsUtils";
+import EraBackgroundWrapper from "@/components/EraBackgroundWrapper";
 
 export interface User {
   uid: string;
@@ -396,86 +397,92 @@ export default function FriendsPage() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007bff" />
-      </View>
+      <EraBackgroundWrapper>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007bff" />
+        </View>
+      </EraBackgroundWrapper>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Leaderboard</Text>
-      <View style={styles.addFriendBox}>
-        <TextInput
-          placeholder="Enter friend's username"
-          value={newUsername}
-          onChangeText={setNewUsername}
-          style={styles.input}
-        />
-        <Button
-          title={isAdding ? "Adding..." : "Send Add Request"}
-          onPress={addFriendByUsername}
-          disabled={isAdding}
+    <EraBackgroundWrapper>
+      <View style={styles.container}>
+        <Text style={styles.header}>Friends</Text>
+        <View style={styles.addFriendBox}>
+          <TextInput
+            placeholder="Enter friend's username"
+            placeholderTextColor="#888"
+            value={newUsername}
+            onChangeText={setNewUsername}
+            style={styles.input}
+          />
+          <Button
+            title={isAdding ? "Adding..." : "Send Add Request"}
+            onPress={addFriendByUsername}
+            disabled={isAdding}
+          />
+        </View>
+
+        {pendingRequests.length > 0 && (
+          <View style={styles.pendingContainer}>
+            <TouchableOpacity
+              onPress={() => setPendingExpanded(!pendingExpanded)}
+              style={styles.pendingHeaderRow}
+            >
+              <Text style={styles.pendingHeader}>
+                Pending Friend Requests ({pendingRequests.length})
+              </Text>
+              <Feather
+                name={pendingExpanded ? "chevron-up" : "chevron-down"}
+                size={20}
+                color="#333"
+              />
+            </TouchableOpacity>
+            {pendingExpanded &&
+              pendingRequests.map((req) => (
+                <View key={req.uid} style={styles.pendingCard}>
+                  <Text style={styles.name}>{req.username}</Text>
+                  <View style={styles.acceptRejectRow}>
+                    <TouchableOpacity
+                      style={styles.acceptButton}
+                      onPress={() => acceptRequest(req.uid)}
+                    >
+                      <Feather name="check" size={16} color="#28a745" />
+                      <Text style={styles.acceptText}>Accept</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.rejectButton}
+                      onPress={() => rejectRequest(req.uid)}
+                    >
+                      <Feather name="x" size={16} color="#dc3545" />
+                      <Text style={styles.rejectText}>Reject</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+          </View>
+        )}
+
+        <FlatList
+          data={leaderboardData}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.uid}
+          ListEmptyComponent={<Text style={styles.empty}>No friends yet.</Text>}
         />
       </View>
-
-      {pendingRequests.length > 0 && (
-        <View style={styles.pendingContainer}>
-          <TouchableOpacity
-            onPress={() => setPendingExpanded(!pendingExpanded)}
-            style={styles.pendingHeaderRow}
-          >
-            <Text style={styles.pendingHeader}>
-              Pending Friend Requests ({pendingRequests.length})
-            </Text>
-            <Feather
-              name={pendingExpanded ? "chevron-up" : "chevron-down"}
-              size={20}
-              color="#333"
-            />
-          </TouchableOpacity>
-          {pendingExpanded &&
-            pendingRequests.map((req) => (
-              <View key={req.uid} style={styles.pendingCard}>
-                <Text style={styles.name}>{req.username}</Text>
-                <View style={styles.acceptRejectRow}>
-                  <TouchableOpacity
-                    style={styles.acceptButton}
-                    onPress={() => acceptRequest(req.uid)}
-                  >
-                    <Feather name="check" size={16} color="#28a745" />
-                    <Text style={styles.acceptText}>Accept</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.rejectButton}
-                    onPress={() => rejectRequest(req.uid)}
-                  >
-                    <Feather name="x" size={16} color="#dc3545" />
-                    <Text style={styles.rejectText}>Reject</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-        </View>
-      )}
-
-      <FlatList
-        data={leaderboardData}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.uid}
-        ListEmptyComponent={<Text style={styles.empty}>No friends yet.</Text>}
-      />
-    </View>
+    </EraBackgroundWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: "#fff" },
-  header: { fontSize: 24, fontWeight: "bold", marginBottom: 20 },
+  container: { flex: 1, padding: 20 },
+  header: { fontSize: 28, fontWeight: "bold", marginBottom: 20 },
   addFriendBox: { marginBottom: 20 },
   input: {
     borderWidth: 1,
     borderColor: "#ccc",
+    backgroundColor: "#fff",
     borderRadius: 6,
     padding: 10,
     marginBottom: 10,

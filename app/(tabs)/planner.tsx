@@ -14,9 +14,9 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import DateTimePickerModal from "react-native-modal-datetime-picker";
 import DropDownPicker from "react-native-dropdown-picker";
+import { Swipeable } from "react-native-gesture-handler";
 // @ts-ignore
 import Icon from "react-native-vector-icons/Feather";
-import { Swipeable } from "react-native-gesture-handler";
 import { db } from "@/firebaseConfig";
 import {
   collection,
@@ -26,6 +26,11 @@ import {
   doc,
   updateDoc,
 } from "firebase/firestore";
+import EraBackgroundWrapper from "@/components/EraBackgroundWrapper";
+// @ts-ignore
+import Feather from "react-native-vector-icons/Feather";
+// @ts-ignore
+import FontAwesome5 from "react-native-vector-icons/FontAwesome5";
 
 interface Task {
   id: string;
@@ -67,10 +72,6 @@ export default function PlannerPage() {
     } catch (err) {
       console.error("Error loading tasks:", err);
     }
-  };
-
-  const saveTasks = async () => {
-    await AsyncStorage.setItem("plannerTasks", JSON.stringify(tasks));
   };
 
   const addTask = async () => {
@@ -182,168 +183,172 @@ export default function PlannerPage() {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior="padding">
-      <FlatList
-        data={getSortedTasks()}
-        keyExtractor={(item) => item.id}
-        ListHeaderComponent={
-          <View>
-            <Text style={styles.title}>Planner</Text>
+    <EraBackgroundWrapper>
+      <KeyboardAvoidingView style={styles.container} behavior="padding">
+        <FlatList
+          data={getSortedTasks()}
+          keyExtractor={(item) => item.id}
+          ListHeaderComponent={
+            <View>
+              <Text style={styles.title}>Planner</Text>
 
-            {/* SORT BY */}
-            <Text style={styles.sortLabel}>Sort by:</Text>
-            <DropDownPicker
-              open={sortOpen}
-              value={sortBy}
-              items={[
-                { label: "Deadline", value: "deadline" },
-                { label: "Priority", value: "priority" },
-              ]}
-              setOpen={setSortOpen}
-              setValue={setSortBy}
-              containerStyle={{ marginBottom: 10 }}
-              style={styles.dropdown}
-              dropDownContainerStyle={styles.dropdownContainer}
-              zIndex={3000}
-              zIndexInverse={1000}
-              dropDownDirection="TOP"
-            />
-
-            {/* Task List Heading */}
-            <Text style={styles.listLabel}>Task List:</Text>
-
-            {tasks.length === 0 && (
-              <Text style={styles.emptyText}>
-                No tasks yet — start by adding one!
-              </Text>
-            )}
-          </View>
-        }
-        renderItem={({ item }) => (
-          <View style={{ marginBottom: 12 }}>
-            <Swipeable renderRightActions={() => renderRightActions(item.id)}>
-              <View
-                style={[
-                  styles.taskCard,
-                  { backgroundColor: getPriorityColor(item.priority) },
+              <Text style={styles.sortLabel}>Sort by:</Text>
+              <DropDownPicker
+                open={sortOpen}
+                value={sortBy}
+                items={[
+                  { label: "Deadline", value: "deadline" },
+                  { label: "Priority", value: "priority" },
                 ]}
-              >
-                <TouchableOpacity
-                  onPress={() => toggleDone(item.id)}
+                setOpen={setSortOpen}
+                setValue={setSortBy}
+                containerStyle={{ marginBottom: 10 }}
+                style={styles.dropdown}
+                dropDownContainerStyle={styles.dropdownContainer}
+                zIndex={3000}
+                zIndexInverse={1000}
+                dropDownDirection="TOP"
+              />
+
+              <Text style={styles.listLabel}>Task List:</Text>
+
+              {tasks.length === 0 && (
+                <Text style={styles.emptyText}>
+                  No tasks yet — start by adding one!
+                </Text>
+              )}
+            </View>
+          }
+          renderItem={({ item }) => (
+            <View style={{ marginBottom: 12 }}>
+              <Swipeable renderRightActions={() => renderRightActions(item.id)}>
+                <View
                   style={[
-                    styles.circleButton,
-                    item.done && styles.circleButtonDone,
+                    styles.taskCard,
+                    { backgroundColor: getPriorityColor(item.priority) },
                   ]}
                 >
-                  {item.done && <Icon name="check" size={16} color="white" />}
-                </TouchableOpacity>
-
-                <View style={{ flex: 1 }}>
-                  <Text
+                  <TouchableOpacity
+                    onPress={() => toggleDone(item.id)}
                     style={[
-                      styles.taskTitle,
-                      item.done && {
-                        textDecorationLine: "line-through",
-                        color: "#aaa",
-                      },
+                      styles.circleButton,
+                      item.done && styles.circleButtonDone,
                     ]}
                   >
-                    {item.text}
-                  </Text>
-                  <Text style={styles.taskMeta}>📅 Due: {item.dueDate}</Text>
-                  <Text style={styles.taskMeta}>
-                    🎯 Priority: {item.priority}
-                  </Text>
+                    {item.done && <Icon name="check" size={16} color="white" />}
+                  </TouchableOpacity>
+
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[
+                        styles.taskTitle,
+                        item.done && {
+                          textDecorationLine: "line-through",
+                          color: "#aaa",
+                        },
+                      ]}
+                    >
+                      {item.text}
+                    </Text>
+                    <View style={styles.metaRow}>
+                      <Feather name="calendar" size={16} color="#333" style={styles.metaIcon} />
+                      <Text style={styles.taskMeta}>Due: {item.dueDate}</Text>
+                    </View>
+                    <View style={styles.metaRow}>
+                      <FontAwesome5 name="bullseye" size={16} color="#333" style={styles.metaIcon} />
+                      <Text style={styles.taskMeta}>Priority: {item.priority}</Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={() => deleteTask(item.id)}
+                    style={styles.binButton}
+                  >
+                    <Icon name="trash-2" size={20} color="#d11a2a" />
+                  </TouchableOpacity>
                 </View>
+              </Swipeable>
+            </View>
+          )}
+          ListFooterComponent={
+            <View>
+              <TouchableOpacity
+                style={styles.newTaskButton}
+                onPress={() => setShowAddTask(!showAddTask)}
+              >
+                <Text style={styles.newTaskButtonText}>
+                  {showAddTask ? "Cancel" : "+ New Task"}
+                </Text>
+              </TouchableOpacity>
 
-                {/* Bin button */}
-                <TouchableOpacity
-                  onPress={() => deleteTask(item.id)}
-                  style={styles.binButton}
-                >
-                  <Icon name="trash-2" size={20} color="#d11a2a" />
-                </TouchableOpacity>
-              </View>
-            </Swipeable>
-          </View>
-        )}
-        ListFooterComponent={
-          <View>
-            <TouchableOpacity
-              style={styles.newTaskButton}
-              onPress={() => setShowAddTask(!showAddTask)}
-            >
-              <Text style={styles.newTaskButtonText}>
-                {showAddTask ? "Cancel" : "+ New Task"}
-              </Text>
-            </TouchableOpacity>
+              {showAddTask && (
+                <View style={styles.inputCard}>
+                  <TextInput
+                    placeholder="Task description"
+                    value={text}
+                    onChangeText={setText}
+                    style={styles.input}
+                  />
 
-            {showAddTask && (
-              <View style={styles.inputCard}>
-                <TextInput
-                  placeholder="Task description"
-                  value={text}
-                  onChangeText={setText}
-                  style={styles.input}
-                />
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => setShowDatePicker(true)}
+                  >
+                    <View style={styles.metaRow}>
+                      <Feather name="calendar" size={16} color="#333" style={styles.metaIcon} />
+                      <Text style={styles.taskMeta}>Due: {dueDate.toISOString().split("T")[0]}</Text>
+                    </View>
+                  </TouchableOpacity>
 
-                {/* DUE DATE BUTTON */}
-                <TouchableOpacity
-                  style={styles.dateButton}
-                  onPress={() => setShowDatePicker(true)}
-                >
-                  <Text style={styles.dateText}>
-                    📅 Due: {dueDate.toISOString().split("T")[0]}
-                  </Text>
-                </TouchableOpacity>
+                  <DateTimePickerModal
+                    isVisible={showDatePicker}
+                    mode="date"
+                    date={dueDate}
+                    display={Platform.OS === "ios" ? "inline" : "default"}
+                    onConfirm={(date) => {
+                      setDueDate(date);
+                      setShowDatePicker(false);
+                    }}
+                    onCancel={() => setShowDatePicker(false)}
+                  />
 
-                <DateTimePickerModal
-                  isVisible={showDatePicker}
-                  mode="date"
-                  date={dueDate}
-                  display={Platform.OS === "ios" ? "inline" : "default"}
-                  onConfirm={(date) => {
-                    setDueDate(date);
-                    setShowDatePicker(false);
-                  }}
-                  onCancel={() => setShowDatePicker(false)}
-                />
+                  <View style={[styles.metaRow, { marginBottom: 6 }]}>
+                    <FontAwesome5 name="bullseye" size={16} color="#333" style={styles.metaIcon} />
+                    <Text style={styles.taskMeta}>Priority:</Text>
+                  </View>
+                  <DropDownPicker
+                    open={priorityOpen}
+                    value={priority}
+                    items={[
+                      { label: "Low", value: "Low" },
+                      { label: "Medium", value: "Medium" },
+                      { label: "High", value: "High" },
+                    ]}
+                    setOpen={setPriorityOpen}
+                    setValue={setPriority}
+                    containerStyle={{ marginBottom: 10 }}
+                    style={styles.dropdown}
+                    dropDownContainerStyle={styles.dropdownContainer}
+                    zIndex={2000}
+                    zIndexInverse={1000}
+                    dropDownDirection="TOP"
+                  />
 
-                {/* PRIORITY PICKER */}
-                <Text style={styles.label}>Priority:</Text>
-                <DropDownPicker
-                  open={priorityOpen}
-                  value={priority}
-                  items={[
-                    { label: "Low", value: "Low" },
-                    { label: "Medium", value: "Medium" },
-                    { label: "High", value: "High" },
-                  ]}
-                  setOpen={setPriorityOpen}
-                  setValue={setPriority}
-                  containerStyle={{ marginBottom: 10 }}
-                  style={styles.dropdown}
-                  dropDownContainerStyle={styles.dropdownContainer}
-                  zIndex={2000}
-                  zIndexInverse={1000}
-                  dropDownDirection="TOP"
-                />
-
-                {/* ADD BUTTON */}
-                <TouchableOpacity style={styles.addButton} onPress={addTask}>
-                  <Text style={styles.addButtonText}>+ Add Task</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        }
-      />
-    </KeyboardAvoidingView>
+                  <TouchableOpacity style={styles.addButton} onPress={addTask}>
+                    <Text style={styles.addButtonText}>+ Add Task</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          }
+        />
+      </KeyboardAvoidingView>
+    </EraBackgroundWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff", padding: 20 },
+  container: { flex: 1, backgroundColor: "transparent", padding: 20 },
   title: { fontSize: 28, fontWeight: "bold", marginBottom: 20 },
   listLabel: { fontSize: 18, fontWeight: "bold", marginBottom: 10 },
   inputCard: {
@@ -453,5 +458,13 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "bold",
     fontSize: 16,
+  },
+  metaRow: {
+  flexDirection: "row",
+  alignItems: "center",
+  marginTop: 4,
+  },
+  metaIcon: {
+    marginRight: 6,
   },
 });

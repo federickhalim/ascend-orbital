@@ -21,9 +21,12 @@ export default function EraTransitionWrapper({
 
   const eraOrder = (era: "ancient" | "renaissance" | "future") => {
     switch (era) {
-      case "ancient": return 0;
-      case "renaissance": return 1;
-      case "future": return 2;
+      case "ancient":
+        return 0;
+      case "renaissance":
+        return 1;
+      case "future":
+        return 2;
     }
   };
 
@@ -48,7 +51,10 @@ export default function EraTransitionWrapper({
           useNativeDriver: true,
         }),
       ]).start(() => {
-        setPrevEra(currentEra);
+        // 🩹 Defer setState to avoid insertion effect warning
+        requestAnimationFrame(() => {
+          setPrevEra(currentEra);
+        });
       });
     }
   }, [currentEra]);

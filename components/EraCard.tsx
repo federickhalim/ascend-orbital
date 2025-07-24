@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   locked: {
-    opacity: 0.4,
+    opacity: 0.55,
   },
   lockText: {
     color: "#666",

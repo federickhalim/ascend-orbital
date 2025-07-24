@@ -10,8 +10,8 @@ import FutureMap from "@/components/FutureMap";
 import EraTransitionWrapper from "@/components/EraTransitionWrapper";
 import { RENAISSANCE_START, FUTURE_START } from "@/config/eraThresholdConfig";
 import { formatDuration } from "@/utils/formatDuration";
-// @ts-ignore
-import Icon from "react-native-vector-icons/Feather";
+import EraBackgroundWrapper from "@/components/EraBackgroundWrapper";
+
 // @ts-ignore
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 
@@ -56,76 +56,72 @@ export default function VisitEraScreen() {
     return () => unsub();
   }, [friendId]);
 
-  if (loading) {
+  if (loading || !friendData) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={styles.container}>
         <ActivityIndicator size="large" color="#007bff" />
       </View>
     );
   }
 
-  if (!friendData) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text>Unable to load friend data.</Text>
-      </View>
-    );
-  }
+  const liveFocusTime = friendData.totalFocusTime ?? 0;
 
-  const liveFocusTime = friendData.totalFocusTime || 0;
+  const currentEra =
+    liveFocusTime >= FUTURE_START
+      ? "future"
+      : liveFocusTime >= RENAISSANCE_START
+      ? "renaissance"
+      : "ancient";
 
-  let currentEra: "ancient" | "renaissance" | "future" = "ancient";
-  if (liveFocusTime >= FUTURE_START) {
-    currentEra = "future";
-  } else if (liveFocusTime >= RENAISSANCE_START) {
-    currentEra = "renaissance";
-  }
-
-  let MapComponent = AncientMap;
-  if (currentEra === "renaissance") {
-    MapComponent = RenaissanceMap;
-  } else if (currentEra === "future") {
-    MapComponent = FutureMap;
-  }
+  const MapComponent =
+    currentEra === "future"
+      ? FutureMap
+      : currentEra === "renaissance"
+      ? RenaissanceMap
+      : AncientMap;
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>
-        Visiting {friendData.username || "Friend"}'s Era
-      </Text>
-      <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <MaterialCommunityIcons
-          name="fire"
-          size={20}
-          color="#ff4500"
-          style={{ marginRight: 3 }}
-        />
-        <Text style={styles.meta}>Streak: {friendData.streak ?? 0} days</Text>
-      </View>
-      <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <MaterialCommunityIcons
-          name="timer-sand"
-          size={20}
-          color="#007bff"
-          style={{ marginRight: 3 }}
-        />
-        <Text style={styles.meta}>
-          Total Focus Time: {formatDuration(liveFocusTime)}
+    <EraBackgroundWrapper focusTime={liveFocusTime}>
+      <View style={styles.container}>
+        <Text style={styles.title}>
+          Visiting {friendData.username || "Friend"}'s Era
+        </Text>
+
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <MaterialCommunityIcons
+            name="fire"
+            size={20}
+            color="#ff4500"
+            style={{ marginRight: 3 }}
+          />
+          <Text style={styles.meta}>Streak: {friendData.streak ?? 0} days</Text>
+        </View>
+
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <MaterialCommunityIcons
+            name="timer-sand"
+            size={20}
+            color="#007bff"
+            style={{ marginRight: 3 }}
+          />
+          <Text style={styles.meta}>
+            Total Focus Time: {formatDuration(liveFocusTime)}
+          </Text>
+        </View>
+
+        <EraTransitionWrapper currentEra={currentEra}>
+          <MapComponent totalFocusTime={liveFocusTime} />
+        </EraTransitionWrapper>
+
+        <Text style={styles.eraLabel}>
+          {currentEra === "ancient"
+            ? "🏺 Ancient Egypt"
+            : currentEra === "renaissance"
+            ? "🎭 Renaissance"
+            : "🛸 Future"}
         </Text>
       </View>
-
-      <EraTransitionWrapper currentEra={currentEra}>
-        <MapComponent totalFocusTime={liveFocusTime} />
-      </EraTransitionWrapper>
-
-      <Text style={styles.eraLabel}>
-        {currentEra === "ancient"
-          ? "🏺 Ancient Egypt"
-          : currentEra === "renaissance"
-          ? "🎭 Renaissance"
-          : "🛸 Future"}
-      </Text>
-    </View>
+    </EraBackgroundWrapper>
   );
 }
 
@@ -134,10 +130,23 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     paddingTop: 60,
-    backgroundColor: "#f7f7f7",
   },
-  title: { fontSize: 22, fontWeight: "bold", marginBottom: 8, color: "#333" },
-  meta: { fontSize: 16, color: "#555", marginBottom: 0 },
-  eraLabel: { marginTop: 12, fontSize: 18, fontWeight: "600", color: "#333" },
-  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  title: {
+    fontSize: 22,
+    fontWeight: "bold",
+    marginBottom: 8,
+    color: "#333",
+  },
+  meta: {
+    fontSize: 16,
+    color: "#333",
+    fontWeight: "600",
+    marginBottom: 0,
+  },
+  eraLabel: {
+    marginTop: 12,
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#333",
+  },
 });

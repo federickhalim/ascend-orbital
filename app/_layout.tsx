@@ -14,6 +14,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { useColorScheme } from "@/components/useColorScheme";
 import { preloadAssets } from "@/utils/preloadAssets";
+import { FocusProvider } from "@/context/FocusContext"; 
 
 export { ErrorBoundary } from "expo-router";
 
@@ -54,7 +55,6 @@ export default function RootLayout() {
           setTimeout(() => {
             router.replace("/(auth)/login");
           }, 0);
-
           return;
         }
 
@@ -74,40 +74,37 @@ export default function RootLayout() {
             console.error(" Firebase auth check failed:", data.error?.message);
           }
           await AsyncStorage.multiRemove(["userId", "userToken"]);
-
           setTimeout(() => {
             router.replace("/(auth)/login");
           }, 0);
-
           return;
         }
       } catch (e) {
         console.error("🔥 Auth check failed:", e);
         await AsyncStorage.multiRemove(["userId", "userToken"]);
-
         setTimeout(() => {
           router.replace("/(auth)/login");
         }, 0);
       } finally {
         setCheckingAuth(false);
-
         SplashScreen.hideAsync();
       }
     };
 
     if (loaded) {
       loadResourcesAndCheckAuth();
-    } else {
     }
   }, [loaded]);
 
   if (!loaded || checkingAuth) {
-    return null; // or return <Text>Loading...</Text>
+    return null;
   }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <RootLayoutNav />
+      <FocusProvider>
+        <RootLayoutNav />
+      </FocusProvider>
     </GestureHandlerRootView>
   );
 }

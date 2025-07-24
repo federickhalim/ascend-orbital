@@ -8,6 +8,7 @@ import {
   Alert,
   TextInput,
   Button,
+  ImageBackground,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
@@ -52,7 +53,6 @@ export default function ProfileScreen() {
         setPhotoURL(data.photoURL || "");
         setEmail(data.email || "");
 
-        // ✅ Ensure default profile picture if not set
         if (!data.photoURL) {
           await updateDoc(doc(db, "users", userId), {
             photoURL: "sphinx-profile.png",
@@ -83,13 +83,11 @@ export default function ProfileScreen() {
     if (!userId) return;
     const trimmed = username.trim();
 
-    // 1. Empty check
     if (!trimmed) {
       Alert.alert("Invalid username", "Username cannot be empty.");
       return;
     }
 
-    // 2. Character validation
     const validUsernameRegex = /^[a-zA-Z0-9._-]+$/;
     if (!validUsernameRegex.test(trimmed)) {
       Alert.alert(
@@ -99,7 +97,6 @@ export default function ProfileScreen() {
       return;
     }
 
-    // 3. Uniqueness check
     const q = query(collection(db, "users"), where("username", "==", trimmed));
     const snapshot = await getDocs(q);
     const isTaken = snapshot.docs.some((docSnap) => docSnap.id !== userId);
@@ -109,7 +106,6 @@ export default function ProfileScreen() {
       return;
     }
 
-    // 4. Save
     await updateDoc(doc(db, "users", userId), {
       username: trimmed,
     });
@@ -125,41 +121,48 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Image source={getLocalImage()} style={styles.avatar} />
-      <Text style={styles.label}>Select a Profile Picture:</Text>
-      <View style={styles.picRow}>
-        {profilePics.map((img, idx) => (
-          <TouchableOpacity key={idx} onPress={() => selectProfilePic(idx)}>
-            <Image
-              source={img}
-              style={[
-                styles.picOption,
-                photoURL.includes(["sphinx", "griffin", "robot"][idx])
-                  ? styles.selectedPic
-                  : {},
-              ]}
-            />
-          </TouchableOpacity>
-        ))}
-      </View>
+    <ImageBackground
+      source={require("@/assets/images/settings-profile-bg.png")}
+      style={{ flex: 1 }}
+      resizeMode="cover"
+    >
+      <View style={styles.container}>
+        <Image source={getLocalImage()} style={styles.avatar} />
+        <Text style={styles.label}>Select a Profile Picture:</Text>
+        <View style={styles.picRow}>
+          {profilePics.map((img, idx) => (
+            <TouchableOpacity key={idx} onPress={() => selectProfilePic(idx)}>
+              <Image
+                source={img}
+                style={[
+                  styles.picOption,
+                  photoURL.includes(["sphinx", "griffin", "robot"][idx])
+                    ? styles.selectedPic
+                    : {},
+                ]}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
 
-      <View style={styles.field}>
-        <Text style={styles.label}>Email:</Text>
-        <Text>{email || "N/A"}</Text>
-      </View>
+        <View style={styles.field}>
+          <Text style={styles.label}>Email:</Text>
+          <Text>{email || "N/A"}</Text>
+        </View>
 
-      <View style={styles.field}>
-        <Text style={styles.label}>Username:</Text>
-        <TextInput
-          value={username}
-          onChangeText={setUsername}
-          placeholder="Username"
-          style={styles.input}
-        />
-        <Button title="Save Username" onPress={saveUsername} />
+        <View style={styles.field}>
+          <Text style={styles.label}>Username:</Text>
+          <TextInput
+            value={username}
+            onChangeText={setUsername}
+            placeholder="Username"
+            placeholderTextColor="#888"
+            style={styles.input}
+          />
+          <Button title="Save Username" onPress={saveUsername} />
+        </View>
       </View>
-    </View>
+    </ImageBackground>
   );
 }
 
@@ -167,7 +170,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 24,
-    backgroundColor: "#fff",
+    backgroundColor: "transparent",
     alignItems: "center",
   },
   avatar: { width: 120, height: 120, borderRadius: 60, marginBottom: 12 },
@@ -182,5 +185,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     padding: 8,
     marginBottom: 8,
+    backgroundColor: "#fff",
+    color: "#000",
   },
 });

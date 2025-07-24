@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Modal,
   ActivityIndicator,
+  ImageBackground,
 } from "react-native";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -15,7 +16,6 @@ import { db } from "@/firebaseConfig";
 import { badgeConfig, Badge } from "@/constants/badgeConfig";
 import { splitBadgesByUnlockStatus } from "@/utils/badgeUtils";
 
-// 🔒 Static image map for dynamic badges
 const badgeImages: Record<string, any> = {
   "ancientbadge-1": require("@/assets/images/badges/ancientbadge-1.png"),
   "ancientbadge-2": require("@/assets/images/badges/ancientbadge-2.png"),
@@ -58,7 +58,6 @@ export default function BadgesScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Load userId from AsyncStorage
   useEffect(() => {
     const loadUserId = async () => {
       const id = await AsyncStorage.getItem("userId");
@@ -67,7 +66,6 @@ export default function BadgesScreen() {
     loadUserId();
   }, []);
 
-  // Fetch stats + unlocked badge list
   useEffect(() => {
     const fetchUserData = async () => {
       if (!userId) return;
@@ -97,7 +95,6 @@ export default function BadgesScreen() {
     if (userId) fetchUserData();
   }, [userId]);
 
-  // Unlock new badges if conditions are met
   useEffect(() => {
     if (!userStats || !userId) return;
 
@@ -158,36 +155,44 @@ export default function BadgesScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.sectionTitle}>My Badges</Text>
-      <View style={styles.grid}>
-        {unlocked.length > 0 ? (
-          unlocked.map((badge) => renderBadge(badge, true))
-        ) : (
-          <Text style={styles.emptyText}>No badges yet — start focusing!</Text>
-        )}
-      </View>
-
-      <Text style={styles.sectionTitle}>Not Unlocked</Text>
-      <View style={styles.grid}>
-        {locked.map((badge) => renderBadge(badge, false))}
-      </View>
-
-      <Modal visible={modalVisible} transparent animationType="fade">
-        <View style={styles.modalBackground}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>{selectedBadge?.name}</Text>
-            <Text style={styles.modalDesc}>{selectedBadge?.description}</Text>
-            <TouchableOpacity
-              style={styles.modalCloseButton}
-              onPress={() => setModalVisible(false)}
-            >
-              <Text style={styles.modalCloseText}>Close</Text>
-            </TouchableOpacity>
-          </View>
+    <ImageBackground
+      source={require("@/assets/images/settings-profile-bg.png")}
+      style={{ flex: 1 }}
+      resizeMode="cover"
+    >
+      <ScrollView contentContainerStyle={styles.container}>
+        <Text style={styles.sectionTitle}>My Badges</Text>
+        <View style={styles.grid}>
+          {unlocked.length > 0 ? (
+            unlocked.map((badge) => renderBadge(badge, true))
+          ) : (
+            <Text style={styles.emptyText}>
+              No badges yet — start focusing!
+            </Text>
+          )}
         </View>
-      </Modal>
-    </ScrollView>
+
+        <Text style={styles.sectionTitle}>Not Unlocked</Text>
+        <View style={styles.grid}>
+          {locked.map((badge) => renderBadge(badge, false))}
+        </View>
+
+        <Modal visible={modalVisible} transparent animationType="fade">
+          <View style={styles.modalBackground}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>{selectedBadge?.name}</Text>
+              <Text style={styles.modalDesc}>{selectedBadge?.description}</Text>
+              <TouchableOpacity
+                style={styles.modalCloseButton}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.modalCloseText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      </ScrollView>
+    </ImageBackground>
   );
 }
 
