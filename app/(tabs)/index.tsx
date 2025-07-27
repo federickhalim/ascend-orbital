@@ -32,8 +32,8 @@ import { useFocusContext } from "@/context/FocusContext";
 import MaterialCommunityIcons from "react-native-vector-icons/MaterialCommunityIcons";
 
 export default function HomeScreen() {
-  const POMODORO_DURATION = 5;
-  const BREAK_DURATION = 3;
+  const POMODORO_DURATION = 25 * 60;
+  const BREAK_DURATION = 5 * 60;
   const router = useRouter();
 
   const {

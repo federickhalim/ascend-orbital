@@ -1,4 +1,4 @@
-export const SECONDS_PER_LEVEL = 5;
+export const SECONDS_PER_LEVEL = 86400;
 export const LEVELS_PER_ERA = 3;
 
 //Ancient Egypt
@@ -6,11 +6,11 @@ export const ANCIENT_START = 0;
 export const ANCIENT_END = ANCIENT_START + LEVELS_PER_ERA * SECONDS_PER_LEVEL;
 
 // Renaissance
-export const RENAISSANCE_START = 20;
+export const RENAISSANCE_START = 86400 * 3;
 export const RENAISSANCE_END = RENAISSANCE_START + LEVELS_PER_ERA * SECONDS_PER_LEVEL;
 
 // Future
-export const FUTURE_START = 40;
+export const FUTURE_START = 86400 * 6;
 export const FUTURE_END = FUTURE_START + LEVELS_PER_ERA * SECONDS_PER_LEVEL;
 
 

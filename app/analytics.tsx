@@ -169,10 +169,10 @@ export default function AnalyticsScreen() {
             <View style={styles.roundedCard}>
               <BarChart
                 data={{
-                  labels: ["M", "T", "W", "T", "F", "S", "S"],
-                  datasets: [{ data: weeklyData }],
+                  labels: ["M", "T", "W", "T", "F", "S", "S", ""],
+                  datasets: [{ data: [...weeklyData, 0] }],
                 }}
-                width={Dimensions.get("window").width - 40}
+                width={Dimensions.get("window").width - 7}
                 height={220}
                 yAxisLabel=""
                 yAxisSuffix="m"
