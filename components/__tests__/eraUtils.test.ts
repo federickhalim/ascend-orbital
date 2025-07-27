@@ -47,9 +47,9 @@ describe("getProgressToNextStage", () => {
   });
 
   it("returns correct progress in Future Era", () => {
-    const result = getProgressToNextStage(FUTURE_START + 7);
+    const result = getProgressToNextStage(FUTURE_START + 2);
     expect(result.label).toBe("Progress to next Future upgrade");
-    expect(result.current).toBe(2); // within level 1
+    expect(result.current).toBe(2);
     expect(result.max).toBe(SECONDS_PER_LEVEL);
   });
 
