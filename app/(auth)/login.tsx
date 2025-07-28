@@ -17,7 +17,7 @@ import { FontAwesome } from "@expo/vector-icons";
 import { Image, ImageBackground } from "react-native";
 import { loginUser, sendPasswordReset } from "@/utils/authUtils";
 
-const FIREBASE_API_KEY = "AIzaSyC6kcCBZoQGxuFAv7VVlY674Ul7C9dyNwU"; // use your actual API key
+const FIREBASE_API_KEY = "AIzaSyC6kcCBZoQGxuFAv7VVlY674Ul7C9dyNwU";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -39,7 +39,7 @@ export default function LoginScreen() {
         Alert.alert("Login failed", result.message);
         return;
       case "UNVERIFIED":
-        console.log("pendingIdToken:", result.idToken); // <- ADD THIS 🔥
+        console.log("pendingIdToken:", result.idToken);
         setPendingIdToken(result.idToken);
         Alert.alert(
           "Email not verified",

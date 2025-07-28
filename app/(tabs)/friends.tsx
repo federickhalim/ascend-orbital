@@ -169,7 +169,7 @@ export default function FriendsPage() {
       }
       setPendingRequests(requestsData);
     } catch (error) {
-      console.error("❌ Error loading friends:", error);
+      console.error(" Error loading friends:", error);
     } finally {
       if (isFirstLoad.current) {
         setLoading(false);

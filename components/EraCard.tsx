@@ -12,7 +12,7 @@ export default function EraCard({
   name,
   image,
   unlocked,
-  isCurrent, // ✅ this was missing
+  isCurrent,
   onPress,
 }: EraCardProps) {
   return (

@@ -36,7 +36,7 @@ export default function EraBackgroundWrapper({
 
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 250, // quick smooth fade
+        duration: 250,
         useNativeDriver: true,
       }).start(() => {
         setCurrentEra(newEra);
